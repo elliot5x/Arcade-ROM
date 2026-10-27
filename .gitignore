@@ -1,0 +1,17 @@
+node_modules/
+dist/
+source/
+references/
+__pycache__/
+.DS_Store
+artifacts/
+*.iso
+*.ISO
+*.rcf
+*.RCF
+*.p3d
+*.rsd
+*.rmv
+.env
+.env.*
+!.env.example
