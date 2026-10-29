@@ -5,7 +5,9 @@
 //        iframe isolado -> o emulador baixa direto do Blob URL -> cleanup agressivo.
 // ---------------------------------------------------------------------------
 import JSZip from 'jszip';
+import packageJson from '../package.json';
 
+const APP_VERSION = packageJson.version;
 const DATA_PATH = 'https://cdn.emulatorjs.org/stable/data/';
 const BOOT_TIMEOUT_MS = 20000;
 const MAX_ROM_BYTES = 5 * 1024 * 1024 * 1024;      // 5 GB — Blobs grandes vão para o disco, não estouram o heap
@@ -108,6 +110,18 @@ function updateControllerStatus() {
 
 window.addEventListener('gamepadconnected', updateControllerStatus);
 window.addEventListener('gamepaddisconnected', updateControllerStatus);
+window.addEventListener('error', event => {
+  const detail = event.error?.stack || event.message || 'Erro não identificado na página.';
+  appendEmulatorLog(`Erro da página: ${detail}`, 'error');
+});
+window.addEventListener('unhandledrejection', event => {
+  const reason = event.reason;
+  const detail = reason?.stack || reason?.message || String(reason || 'Promessa rejeitada sem motivo.');
+  appendEmulatorLog(`Promise rejeitada: ${detail}`, 'error');
+});
+const appVersion = document.getElementById('appVersion');
+if (appVersion) appVersion.textContent = `v${APP_VERSION}`;
+
 updateControllerStatus();
 setInterval(updateControllerStatus, 1500);
 
@@ -373,8 +387,18 @@ function emulatorDocument(controllerProfile = {}) {
       window.EJS_defaultOptions = { 'audio-latency': '256ms' };
       window.EJS_ready = () => parent.postMessage({ type: 'emulator-ready' }, '*');
       window.EJS_onGameStart = () => parent.postMessage({ type: 'game-started' }, '*');
-      addEventListener('error', event => parent.postMessage({ type: 'emulator-error', message: event.message || 'Erro inesperado no emulador.' }, '*'));
-      addEventListener('unhandledrejection', event => parent.postMessage({ type: 'emulator-error', message: String(event.reason || 'Falha ao carregar o jogo.') }, '*'));
+      ['error', 'warn'].forEach(level => {
+        const original = console[level].bind(console);
+        console[level] = (...args) => {
+          original(...args);
+          parent.postMessage({ type: level === 'error' ? 'emulator-error' : 'emulator-warning', message: args.map(value => value?.stack || value?.message || String(value)).join(' ') }, '*');
+        };
+      });
+      addEventListener('error', event => {
+        const location = event.filename ? ' @ ' + event.filename + ':' + event.lineno + ':' + event.colno : '';
+        parent.postMessage({ type: 'emulator-error', message: event.error?.stack || (event.message || 'Erro inesperado no emulador.') + location }, '*');
+      });
+      addEventListener('unhandledrejection', event => parent.postMessage({ type: 'emulator-error', message: event.reason?.stack || event.reason?.message || String(event.reason || 'Falha ao carregar o jogo.') }, '*'));
       const loader = document.createElement('script');
       loader.src = window.EJS_pathtodata + 'loader.js';
       parent.postMessage({ type: 'loader-start' }, '*');
@@ -601,6 +625,9 @@ window.addEventListener('message', event => {
   if (event.data?.type === 'game-started') {
     clearBootTimeout();
     appendEmulatorLog('Jogo iniciado.', 'success');
+  }
+  if (event.data?.type === 'emulator-warning') {
+    appendEmulatorLog(`Aviso do emulador: ${event.data.message}`, 'warning');
   }
   if (event.data?.type === 'emulator-error') {
     clearBootTimeout();
