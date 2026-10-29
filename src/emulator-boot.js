@@ -4,7 +4,9 @@ export const LONG_BOOT_STAGE = /compilando o núcleo|iniciando o jogo/i;
 export const THREAD_REQUIRED_CORES = new Set(['n64', 'nds', 'psp']);
 
 export function bootTimeoutFor(stage) {
-  return LONG_BOOT_STAGE.test(stage) ? CORE_COMPILE_TIMEOUT_MS : BOOT_TIMEOUT_MS;
+  return LONG_BOOT_STAGE.test(stage)
+    ? CORE_COMPILE_TIMEOUT_MS
+    : BOOT_TIMEOUT_MS;
 }
 
 export function coreNeedsThreads(core) {
@@ -13,7 +15,11 @@ export function coreNeedsThreads(core) {
 
 export function bootErrorGuidance(errorMessage = '') {
   const message = errorMessage.toLowerCase();
-  if (message.includes('sharedarraybuffer') || message.includes('crossorigin') || message.includes('cross-origin')) {
+  if (
+    message.includes('sharedarraybuffer') ||
+    message.includes('crossorigin') ||
+    message.includes('cross-origin')
+  ) {
     return 'N64 ou PSP podem exigir isolamento de origem (COOP/COEP). Use HTTPS ou localhost e confirme que o site permite SharedArrayBuffer.';
   }
   if (message.includes('bios')) {

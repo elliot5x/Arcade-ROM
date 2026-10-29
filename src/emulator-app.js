@@ -6,7 +6,11 @@
 // ---------------------------------------------------------------------------
 import packageJson from '../package.json';
 import { detectCore } from './system-detection.js';
-import { bootErrorGuidance, bootTimeoutFor, coreNeedsThreads } from './emulator-boot.js';
+import {
+  bootErrorGuidance,
+  bootTimeoutFor,
+  coreNeedsThreads,
+} from './emulator-boot.js';
 import { extractZipEntry, inspectZip, isZipFile } from './zip-inspector.js';
 import { setLiveStatus, updateDragState } from './ui.js';
 
@@ -65,7 +69,9 @@ function updateControllerStatus() {
     if (dot) dot.style.background = '#777';
     return;
   }
-  controllerStatus.textContent = gamepads.map((gamepad, index) => gamepad.id || `Controle ${index + 1}`).join(' · ');
+  controllerStatus.textContent = gamepads
+    .map((gamepad, index) => gamepad.id || `Controle ${index + 1}`)
+    .join(' · ');
   controllerStatus.dataset.connected = 'true';
   if (dot) dot.style.background = 'var(--good)';
 }
@@ -73,12 +79,16 @@ function updateControllerStatus() {
 window.addEventListener('gamepadconnected', updateControllerStatus);
 window.addEventListener('gamepaddisconnected', updateControllerStatus);
 window.addEventListener('error', (event) => {
-  const detail = event.error?.stack || event.message || 'Erro não identificado na página.';
+  const detail =
+    event.error?.stack || event.message || 'Erro não identificado na página.';
   appendEmulatorLog(`Erro da página: ${detail}`, 'error');
 });
 window.addEventListener('unhandledrejection', (event) => {
   const reason = event.reason;
-  const detail = reason?.stack || reason?.message || String(reason || 'Promessa rejeitada sem motivo.');
+  const detail =
+    reason?.stack ||
+    reason?.message ||
+    String(reason || 'Promessa rejeitada sem motivo.');
   appendEmulatorLog(`Promise rejeitada: ${detail}`, 'error');
 });
 const appVersion = document.getElementById('appVersion');
@@ -113,7 +123,8 @@ function appendEmulatorLog(message, kind = 'info') {
   text.textContent = message;
   entry.append(time, text);
   emulatorLogs.append(entry);
-  while (emulatorLogs.children.length > 80) emulatorLogs.firstElementChild.remove();
+  while (emulatorLogs.children.length > 80)
+    emulatorLogs.firstElementChild.remove();
   emulatorLogs.scrollTop = emulatorLogs.scrollHeight;
 }
 
@@ -145,8 +156,14 @@ function watchBootProgress(frame, stage) {
     if (activeFrame !== frame) return;
     bootTimeout = null;
     const seconds = Math.round(timeout / 1000);
-    appendEmulatorLog(`Tempo esgotado (${seconds}s) na etapa: ${stage}.`, 'error');
-    failEmulatorBoot(frame, `O emulador não respondeu durante a etapa “${stage}” em ${seconds} segundos.`);
+    appendEmulatorLog(
+      `Tempo esgotado (${seconds}s) na etapa: ${stage}.`,
+      'error'
+    );
+    failEmulatorBoot(
+      frame,
+      `O emulador não respondeu durante a etapa “${stage}” em ${seconds} segundos.`
+    );
   }, timeout);
 }
 
@@ -185,7 +202,10 @@ async function failEmulatorBoot(frame, message) {
     operation += 1;
   }
   await cleanupEmulator(frame);
-  appendEmulatorLog('Boot cancelado. Escolha a ROM novamente para tentar de novo.', 'error');
+  appendEmulatorLog(
+    'Boot cancelado. Escolha a ROM novamente para tentar de novo.',
+    'error'
+  );
   setUploadStatus(message, 'error');
   const guidance = bootErrorGuidance(message);
   if (guidance) {
@@ -281,7 +301,9 @@ function renderCatalog(title, items, onPick) {
     li.append(info, play);
     catalogList.append(li);
   });
-  requestAnimationFrame(() => catalogList.querySelector('.catalog-play')?.focus());
+  requestAnimationFrame(() =>
+    catalogList.querySelector('.catalog-play')?.focus()
+  );
 }
 
 function hideCatalog() {
@@ -403,7 +425,11 @@ function emulatorDocument() {
 // ---------------------------------------------------------------------------
 // Pipeline principal: origem -> Blob -> (ZIP?) -> iframe
 // ---------------------------------------------------------------------------
-async function startRom(source, requestedCore = null, { displayName = null } = {}) {
+async function startRom(
+  source,
+  requestedCore = null,
+  { displayName = null } = {}
+) {
   // FIX: antes stopEmulator() não era aguardado. Sua continuação (após o await interno)
   // rodava depois do boot começar e zerava activeFrame / escondia o emulador,
   // fazendo o app ignorar todas as mensagens do iframe.
@@ -418,7 +444,10 @@ async function startRom(source, requestedCore = null, { displayName = null } = {
     blob = source;
     blobName = source.name;
   } else {
-    blob = source.blob instanceof Blob ? source.blob : new Blob([source.bytes], { type: 'application/octet-stream' });
+    blob =
+      source.blob instanceof Blob
+        ? source.blob
+        : new Blob([source.bytes], { type: 'application/octet-stream' });
     blobName = source.name;
     displayName = displayName ?? source.displayName ?? null; // FIX: displayName do objeto era ignorado
   }
@@ -427,9 +456,13 @@ async function startRom(source, requestedCore = null, { displayName = null } = {
   const probe = await probeBlob(blob);
   if (currentOperation !== operation) return;
 
-  const forcedSystem = requestedCore || (systemSelect.value !== 'auto' ? systemSelect.value : null);
+  const forcedSystem =
+    requestedCore ||
+    (systemSelect.value !== 'auto' ? systemSelect.value : null);
   // Arcade (MAME/FBNeo) precisa do .zip inteiro: não descompactar.
-  const unzip = isZipFile(probe, blobName) && !['arcade', 'mame2003'].includes(forcedSystem);
+  const unzip =
+    isZipFile(probe, blobName) &&
+    !['arcade', 'mame2003'].includes(forcedSystem);
 
   // FIX: antes um .zip sem sistema escolhido pedia o sistema ANTES de inspecionar o conteúdo
   // (getCore devolve null para 'zip'). Agora o ZIP é aberto primeiro e o sistema sai do arquivo interno.
@@ -439,7 +472,10 @@ async function startRom(source, requestedCore = null, { displayName = null } = {
     if (!core) {
       pendingFile = { blob, name: blobName, displayName };
       startWithSystemButton.hidden = false;
-      setUploadStatus(`Arquivo “${blobName}” selecionado. Escolha o sistema do jogo e inicie.`, '');
+      setUploadStatus(
+        `Arquivo “${blobName}” selecionado. Escolha o sistema do jogo e inicie.`,
+        ''
+      );
       return;
     }
   }
@@ -473,11 +509,17 @@ async function startRom(source, requestedCore = null, { displayName = null } = {
               hideCatalog();
               await startRom(extracted, requestedCore);
             } catch (error) {
-              setUploadStatus(`Falha ao extrair “${chosen.entry.name}”: ${error.message}`, 'error');
+              setUploadStatus(
+                `Falha ao extrair “${chosen.entry.name}”: ${error.message}`,
+                'error'
+              );
             }
-          },
+          }
         );
-        setUploadStatus(`O ZIP contém ${inspection.entries.length} jogos possíveis. Escolha abaixo.`, '');
+        setUploadStatus(
+          `O ZIP contém ${inspection.entries.length} jogos possíveis. Escolha abaixo.`,
+          ''
+        );
         return;
       }
 
@@ -485,7 +527,10 @@ async function startRom(source, requestedCore = null, { displayName = null } = {
       appendEmulatorLog(`Extraindo ${innerName} como Blob...`);
       const payload = await extractZipEntry(inspection.entry);
       if (currentOperation !== operation) return;
-      appendEmulatorLog(`Descomprimido: ${formatBytes(payload.size)}.`, 'success');
+      appendEmulatorLog(
+        `Descomprimido: ${formatBytes(payload.size)}.`,
+        'success'
+      );
       const innerProbe = await probeBlob(payload);
       if (currentOperation !== operation) return;
       const innerCore = requestedCore || getCore(innerName, innerProbe);
@@ -497,7 +542,10 @@ async function startRom(source, requestedCore = null, { displayName = null } = {
           displayName: displayName || `${blobName} › ${inspection.entry.name}`,
         };
         startWithSystemButton.hidden = false;
-        setUploadStatus(`Não foi possível identificar o sistema de “${innerName}”. Escolha o sistema e inicie.`, '');
+        setUploadStatus(
+          `Não foi possível identificar o sistema de “${innerName}”. Escolha o sistema e inicie.`,
+          ''
+        );
         return;
       }
       return bootWithBlob(
@@ -505,13 +553,15 @@ async function startRom(source, requestedCore = null, { displayName = null } = {
         innerName,
         innerCore,
         currentOperation,
-        displayName || `${blobName} › ${inspection.entry.name}`,
+        displayName || `${blobName} › ${inspection.entry.name}`
       );
     }
 
     // --- arquivo direto: zero cópias — o Blob/File é gerenciado pelo navegador
     if (blob.size > MAX_ROM_BYTES)
-      throw new Error(`Arquivo de ${formatBytes(blob.size)} excede o limite de ${formatBytes(MAX_ROM_BYTES)}.`);
+      throw new Error(
+        `Arquivo de ${formatBytes(blob.size)} excede o limite de ${formatBytes(MAX_ROM_BYTES)}.`
+      );
     return bootWithBlob(blob, blobName, core, currentOperation, displayName);
   } catch (error) {
     if (currentOperation === operation) {
@@ -532,7 +582,8 @@ function bootWithBlob(blob, fileName, core, currentOperation, displayName) {
   resetEmulatorLogs();
   gameStarted = false;
   document.getElementById('romName').textContent = displayName || fileName;
-  document.getElementById('romCore').textContent = `Núcleo: ${core.toUpperCase()}`;
+  document.getElementById('romCore').textContent =
+    `Núcleo: ${core.toUpperCase()}`;
   uploadView.hidden = true;
   emulatorView.hidden = false;
   appendEmulatorLog(`ROM selecionada: ${fileName} (${formatBytes(blob.size)})`);
@@ -556,13 +607,18 @@ function bootWithBlob(blob, fileName, core, currentOperation, displayName) {
     frame.title = `Emulador: ${displayName || fileName}`;
     frame.setAttribute(
       'sandbox',
-      'allow-scripts allow-downloads allow-same-origin allow-pointer-lock allow-modals allow-forms',
+      'allow-scripts allow-downloads allow-same-origin allow-pointer-lock allow-modals allow-forms'
     );
     frame.tabIndex = 0;
-    frame.setAttribute('allow', 'autoplay; gamepad; fullscreen; cross-origin-isolated');
+    frame.setAttribute(
+      'allow',
+      'autoplay; gamepad; fullscreen; cross-origin-isolated'
+    );
     frame.__onLoad = () => {
       if (activeFrame !== frame) return;
-      appendEmulatorLog(`Enviando Blob URL da ROM (${formatBytes(blob.size)})...`);
+      appendEmulatorLog(
+        `Enviando Blob URL da ROM (${formatBytes(blob.size)})...`
+      );
       watchBootProgress(frame, 'aguardando confirmação de recebimento da ROM');
       const romUrl = createRomUrl(blob);
       frame.contentWindow.postMessage(
@@ -573,7 +629,7 @@ function bootWithBlob(blob, fileName, core, currentOperation, displayName) {
           name: fileName,
           threads: window.crossOriginIsolated === true,
         },
-        '*',
+        '*'
       );
     };
     frame.addEventListener('load', frame.__onLoad, { once: true });
@@ -593,7 +649,10 @@ function bootWithBlob(blob, fileName, core, currentOperation, displayName) {
 // ---------------------------------------------------------------------------
 function receiveFiles(files) {
   if (files.length !== 1) {
-    setUploadStatus('Selecione ou solte exatamente um arquivo de ROM.', 'error');
+    setUploadStatus(
+      'Selecione ou solte exatamente um arquivo de ROM.',
+      'error'
+    );
     return;
   }
   void startRom(files[0]);
@@ -610,26 +669,36 @@ controllerReset?.addEventListener('click', () => {
     const keysToRemove = [];
     for (let index = 0; index < localStorage.length; index += 1) {
       const key = localStorage.key(index);
-      if (key?.startsWith('ejs-') && key.endsWith('-settings')) keysToRemove.push(key);
+      if (key?.startsWith('ejs-') && key.endsWith('-settings'))
+        keysToRemove.push(key);
     }
     keysToRemove.forEach((key) => localStorage.removeItem(key));
   } catch {
     /* armazenamento bloqueado */
   }
-  appendEmulatorLog('Configurações de controle do EmulatorJS restauradas. Reabra a ROM para aplicar.', 'success');
+  appendEmulatorLog(
+    'Configurações de controle do EmulatorJS restauradas. Reabra a ROM para aplicar.',
+    'success'
+  );
 });
 
 removeButton.addEventListener('click', async () => {
-  if (!window.confirm('Remover a ROM atual e liberar a memória do emulador?')) return;
+  if (!window.confirm('Remover a ROM atual e liberar a memória do emulador?'))
+    return;
   await stopEmulator();
   hideCatalog();
-  setUploadStatus('ROM removida e memória liberada. Escolha outro arquivo para jogar.');
+  setUploadStatus(
+    'ROM removida e memória liberada. Escolha outro arquivo para jogar.'
+  );
   romInput.focus();
 });
 
 startWithSystemButton.addEventListener('click', () => {
   if (!pendingFile || systemSelect.value === 'auto') {
-    setUploadStatus('Escolha um sistema específico antes de iniciar este arquivo.', 'error');
+    setUploadStatus(
+      'Escolha um sistema específico antes de iniciar este arquivo.',
+      'error'
+    );
     return;
   }
   const selection = pendingFile;
@@ -652,12 +721,15 @@ window.addEventListener('message', (event) => {
       break;
     case 'loader-ready':
       appendEmulatorLog(
-        `Loader carregado; inicializando core ${document.getElementById('romCore').textContent.replace('Núcleo: ', '')}...`,
+        `Loader carregado; inicializando core ${document.getElementById('romCore').textContent.replace('Núcleo: ', '')}...`
       );
       watchBootProgress(frame, 'baixando e compilando o núcleo');
       break;
     case 'emulator-construction-started':
-      appendEmulatorLog('EmulatorJS criado; baixando e compilando o núcleo…', 'info');
+      appendEmulatorLog(
+        'EmulatorJS criado; baixando e compilando o núcleo…',
+        'info'
+      );
       watchBootProgress(frame, 'baixando e compilando o núcleo');
       break;
     case 'emulator-ready':
@@ -668,10 +740,13 @@ window.addEventListener('message', (event) => {
       break;
     case 'loader-error':
       clearBootTimeout();
-      appendEmulatorLog('Falha ao baixar loader.js. Verifique a conexão com a internet.', 'error');
+      appendEmulatorLog(
+        'Falha ao baixar loader.js. Verifique a conexão com a internet.',
+        'error'
+      );
       void failEmulatorBoot(
         frame,
-        'Não foi possível carregar o EmulatorJS (loader.js). Verifique a conexão e tente novamente.',
+        'Não foi possível carregar o EmulatorJS (loader.js). Verifique a conexão e tente novamente.'
       );
       break;
     case 'game-started':

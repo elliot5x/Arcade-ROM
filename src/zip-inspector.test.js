@@ -1,6 +1,10 @@
 import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
-import { inspectZip, MAX_ZIP_ENTRIES, rankZipEntries } from './zip-inspector.js';
+import {
+  inspectZip,
+  MAX_ZIP_ENTRIES,
+  rankZipEntries,
+} from './zip-inspector.js';
 
 async function zipBytes(files) {
   const zip = new JSZip();
@@ -10,7 +14,10 @@ async function zipBytes(files) {
 
 describe('inspectZip', () => {
   it('selects a single ROM from a ZIP', async () => {
-    const bytes = await zipBytes({ 'readme.txt': 'notes', 'game.sfc': 'rom-data' });
+    const bytes = await zipBytes({
+      'readme.txt': 'notes',
+      'game.sfc': 'rom-data',
+    });
     const result = await inspectZip(bytes);
     expect(result.mode).toBe('single');
     expect(result.entry.name).toBe('game.sfc');
@@ -24,26 +31,40 @@ describe('inspectZip', () => {
     });
     const result = await inspectZip(bytes);
     expect(result.mode).toBe('menu');
-    expect(result.entries.some(({ entry }) => entry.name.includes('__MACOSX'))).toBe(false);
-    expect(result.entries.map(({ entry }) => entry.name)).toEqual(['games/second.nes', 'games/first.gba']);
+    expect(
+      result.entries.some(({ entry }) => entry.name.includes('__MACOSX'))
+    ).toBe(false);
+    expect(result.entries.map(({ entry }) => entry.name)).toEqual([
+      'games/second.nes',
+      'games/first.gba',
+    ]);
   });
 
   it('rejects invalid and empty ZIP archives with useful errors', async () => {
-    await expect(inspectZip(new Uint8Array([1, 2, 3, 4]))).rejects.toThrow(/ZIP válido/i);
-    await expect(inspectZip(await zipBytes({ 'folder/': '' }))).rejects.toThrow(/não contém arquivos/i);
+    await expect(inspectZip(new Uint8Array([1, 2, 3, 4]))).rejects.toThrow(
+      /ZIP válido/i
+    );
+    await expect(inspectZip(await zipBytes({ 'folder/': '' }))).rejects.toThrow(
+      /não contém arquivos/i
+    );
   });
 
   it('rejects ZIPs with no recognized ROM extension', async () => {
-    await expect(inspectZip(await zipBytes({ 'document.txt': 'text' }))).rejects.toThrow(
-      /Nenhum arquivo de ROM reconhecido/i,
-    );
+    await expect(
+      inspectZip(await zipBytes({ 'document.txt': 'text' }))
+    ).rejects.toThrow(/Nenhum arquivo de ROM reconhecido/i);
   });
 
   it('rejects archives beyond the entry limit', async () => {
     const files = Object.fromEntries(
-      Array.from({ length: MAX_ZIP_ENTRIES + 1 }, (_, index) => [`rom-${index}.nes`, 'data']),
+      Array.from({ length: MAX_ZIP_ENTRIES + 1 }, (_, index) => [
+        `rom-${index}.nes`,
+        'data',
+      ])
     );
-    await expect(inspectZip(await zipBytes(files))).rejects.toThrow(/limite 128/i);
+    await expect(inspectZip(await zipBytes(files))).rejects.toThrow(
+      /limite 128/i
+    );
   });
 
   it('ignores hidden metadata and ranks recognized extensions', () => {
@@ -52,6 +73,9 @@ describe('inspectZip', () => {
       { name: 'game.nes', uncompressedSize: 20 },
       { name: 'game.iso', uncompressedSize: 10 },
     ];
-    expect(rankZipEntries(entries).map(({ entry }) => entry.name)).toEqual(['game.nes', 'game.iso']);
+    expect(rankZipEntries(entries).map(({ entry }) => entry.name)).toEqual([
+      'game.nes',
+      'game.iso',
+    ]);
   });
 });

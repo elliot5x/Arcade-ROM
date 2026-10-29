@@ -2,10 +2,15 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <script src="./coi-serviceworker.min.js"></script>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
     <meta name="theme-color" content="#171a18" />
-    <meta name="description" content="Carregue e jogue uma ROM local no navegador." />
+    <meta
+      name="description"
+      content="Carregue e jogue uma ROM local no navegador."
+    />
     <title>Arcade local | Game &amp; ROM</title>
     <style>
       :root {
@@ -28,8 +33,16 @@
         margin: 0;
         min-height: 100vh;
         background:
-          radial-gradient(circle at 15% 0%, rgba(101, 83, 170, 0.22), transparent 34%),
-          radial-gradient(circle at 85% 18%, rgba(41, 178, 173, 0.14), transparent 28%),
+          radial-gradient(
+            circle at 15% 0%,
+            rgba(101, 83, 170, 0.22),
+            transparent 34%
+          ),
+          radial-gradient(
+            circle at 85% 18%,
+            rgba(41, 178, 173, 0.14),
+            transparent 28%
+          ),
           linear-gradient(145deg, #090c14, #101421 55%, #090c14);
         color: var(--ink);
       }
@@ -168,7 +181,11 @@
         text-align: center;
         border: 1px dashed #59647e;
         border-radius: 14px;
-        background: linear-gradient(145deg, rgba(37, 44, 68, 0.92), rgba(24, 29, 47, 0.92));
+        background: linear-gradient(
+          145deg,
+          rgba(37, 44, 68, 0.92),
+          rgba(24, 29, 47, 0.92)
+        );
         transition:
           border-color 0.16s,
           background 0.16s,
@@ -178,7 +195,11 @@
       .dropzone:hover,
       .dropzone.is-dragging {
         border-color: var(--accent);
-        background: linear-gradient(145deg, rgba(43, 53, 80, 0.98), rgba(27, 43, 57, 0.98));
+        background: linear-gradient(
+          145deg,
+          rgba(43, 53, 80, 0.98),
+          rgba(27, 43, 57, 0.98)
+        );
         transform: translateY(-2px);
       }
       .upload-icon {
@@ -670,21 +691,27 @@
     <div class="page">
       <header class="topbar">
         <div class="brand">
-          <span class="brand-mark" aria-hidden="true">AR</span><span>ARCADE ROM</span
+          <span class="brand-mark" aria-hidden="true">AR</span
+          ><span>ARCADE ROM</span
           ><span id="appVersion" class="version-tag">v1.0.3</span>
         </div>
         <div class="top-note">
-          <span class="local-dot" aria-hidden="true"></span><span>ROM carregada localmente</span>
+          <span class="local-dot" aria-hidden="true"></span
+          ><span>ROM carregada localmente</span>
         </div>
       </header>
       <main class="main">
         <p class="eyebrow">Emulador no navegador</p>
         <h1>Escolha uma ROM<br />e comece a jogar.</h1>
         <p class="lede">
-          Selecione uma ROM ou arraste o arquivo para esta página. Todo o processamento acontece localmente, sem enviar
-          o jogo para um servidor.
+          Selecione uma ROM ou arraste o arquivo para esta página. Todo o
+          processamento acontece localmente, sem enviar o jogo para um servidor.
         </p>
-        <section id="uploadView" class="workspace" aria-label="Carregar uma ROM">
+        <section
+          id="uploadView"
+          class="workspace"
+          aria-label="Carregar uma ROM"
+        >
           <div class="upload-pane">
             <label id="dropzone" class="dropzone" for="romInput">
               <input
@@ -704,13 +731,24 @@
                   stroke-linejoin="round"
                 >
                   <path d="M12 16V4m0 0L7 9m5-5 5 5" />
-                  <path d="M4 16.5v2A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5v-2" /></svg
+                  <path
+                    d="M4 16.5v2A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5v-2"
+                  /></svg
               ></span>
               <span class="drop-title">Solte seu jogo aqui</span>
-              <span id="fileHelp" class="drop-help">ROM, ISO, ZIP, 7Z ou RAR compatível, do seu dispositivo</span>
+              <span id="fileHelp" class="drop-help"
+                >ROM, ISO, ZIP, 7Z ou RAR compatível, do seu dispositivo</span
+              >
               <span class="file-button">Selecionar ROM</span>
             </label>
-            <p id="uploadStatus" class="status" role="status" aria-live="polite">Nenhuma ROM carregada.</p>
+            <p
+              id="uploadStatus"
+              class="status"
+              role="status"
+              aria-live="polite"
+            >
+              Nenhuma ROM carregada.
+            </p>
             <progress
               id="romProgress"
               class="progress-track"
@@ -724,15 +762,18 @@
             <section>
               <h2 class="side-title">Arquivo</h2>
               <p class="side-copy">
-                Um arquivo por vez. A extensão não é bloqueada; o EmulatorJS tenta abrir formatos compatíveis com o
-                sistema escolhido.
+                Um arquivo por vez. A extensão não é bloqueada; o EmulatorJS
+                tenta abrir formatos compatíveis com o sistema escolhido.
               </p>
               <div class="formats" aria-label="Exemplos de formatos">
-                <span class="format">ROM</span><span class="format">ZIP</span><span class="format">DISC</span>
+                <span class="format">ROM</span><span class="format">ZIP</span
+                ><span class="format">DISC</span>
               </div>
             </section>
             <section>
-              <label class="core-label" for="systemSelect">Sistema do jogo</label>
+              <label class="core-label" for="systemSelect"
+                >Sistema do jogo</label
+              >
               <select id="systemSelect">
                 <option value="auto">Automático quando reconhecido</option>
                 <option value="nes">Nintendo (NES)</option>
@@ -768,58 +809,104 @@
                 <option value="ws">WonderSwan</option>
                 <option value="dos">DOS</option>
               </select>
-              <button id="startWithSystem" class="action-button system-start" type="button" hidden>
+              <button
+                id="startWithSystem"
+                class="action-button system-start"
+                type="button"
+                hidden
+              >
                 Iniciar com este sistema
               </button>
               <p class="side-copy">
-                ZIP, imagens de disco e extensões ambíguas precisam do sistema correto. Arquivos 7Z e RAR não são
-                descompactados. Alguns jogos também exigem BIOS ou arquivos auxiliares.
+                ZIP, imagens de disco e extensões ambíguas precisam do sistema
+                correto. Arquivos 7Z e RAR não são descompactados. Alguns jogos
+                também exigem BIOS ou arquivos auxiliares.
               </p>
             </section>
             <section>
               <h2 class="side-title">Privacidade</h2>
               <p class="side-copy">
-                O arquivo selecionado é enviado somente ao emulador desta sessão. Remover a ROM encerra o emulador e
-                descarta o contexto carregado.
+                O arquivo selecionado é enviado somente ao emulador desta
+                sessão. Remover a ROM encerra o emulador e descarta o contexto
+                carregado.
               </p>
             </section>
           </aside>
         </section>
-        <section id="catalogSection" class="catalog" aria-label="Catálogo rápido" hidden>
+        <section
+          id="catalogSection"
+          class="catalog"
+          aria-label="Catálogo rápido"
+          hidden
+        >
           <div class="catalog-heading">
             <h2 class="side-title">Jogos encontrados no arquivo</h2>
             <p id="catalogSummary" class="side-copy"></p>
           </div>
           <ul id="catalogList" class="catalog-list"></ul>
         </section>
-        <section id="emulatorView" class="emulator-view" aria-label="Emulador" hidden>
+        <section
+          id="emulatorView"
+          class="emulator-view"
+          aria-label="Emulador"
+          hidden
+        >
           <div class="emulator-toolbar">
-            <div class="rom-label"><strong id="romName"></strong><span id="romCore"></span></div>
-            <button id="removeRom" class="remove-button" type="button">Remover / trocar ROM</button>
+            <div class="rom-label">
+              <strong id="romName"></strong><span id="romCore"></span>
+            </div>
+            <button id="removeRom" class="remove-button" type="button">
+              Remover / trocar ROM
+            </button>
           </div>
           <div class="controller-bar" aria-label="Controles">
             <div>
-              <span class="controller-dot" aria-hidden="true"></span><strong>Controle</strong
+              <span class="controller-dot" aria-hidden="true"></span
+              ><strong>Controle</strong
               ><span id="controllerStatus">Nenhum controle detectado</span>
             </div>
             <div class="controller-actions">
-              <span>Remapear em Configurações → Controles. O perfil fica salvo para outros jogos.</span>
-              <button id="resetControls" class="remove-button" type="button">Restaurar padrão</button>
+              <span
+                >Remapear em Configurações → Controles. O perfil fica salvo para
+                outros jogos.</span
+              >
+              <button id="resetControls" class="remove-button" type="button">
+                Restaurar padrão
+              </button>
             </div>
           </div>
           <div id="emulatorHost"></div>
           <section class="log-console" aria-label="Histórico do emulador">
-            <div class="log-heading"><span class="log-indicator" aria-hidden="true"></span><span>BOOT LOG</span></div>
-            <ol id="emulatorLogs" class="log-list" role="log" aria-live="polite" aria-relevant="additions"></ol>
+            <div class="log-heading">
+              <span class="log-indicator" aria-hidden="true"></span
+              ><span>BOOT LOG</span>
+            </div>
+            <ol
+              id="emulatorLogs"
+              class="log-list"
+              role="log"
+              aria-live="polite"
+              aria-relevant="additions"
+            ></ol>
           </section>
         </section>
       </main>
-      <footer class="footer">EmulatorJS é carregado sob demanda para executar o jogo neste navegador.</footer>
+      <footer class="footer">
+        EmulatorJS é carregado sob demanda para executar o jogo neste navegador.
+      </footer>
     </div>
-    <div id="dropOverlay" class="drop-overlay" hidden>Solte para iniciar a nova ROM</div>
-    <div id="cleanupToast" class="drop-overlay" hidden style="font-size: 15px; letter-spacing: 0.05em">
+    <div id="dropOverlay" class="drop-overlay" hidden>
+      Solte para iniciar a nova ROM
+    </div>
+    <div
+      id="cleanupToast"
+      class="drop-overlay"
+      hidden
+      style="font-size: 15px; letter-spacing: 0.05em"
+    >
       Liberando memória do emulador…
     </div>
+    <script type="module" src="./src/coi-bootstrap.js"></script>
     <script type="module" src="./src/emulator-app.js"></script>
   </body>
 </html>

@@ -3,11 +3,10 @@ import globals from 'globals';
 
 export default [
   {
-    ignores: ['dist/**'],
+    ignores: ['dist/**', 'node_modules/**', 'coverage/**'],
   },
-  js.configs.recommended,
   {
-    files: ['src/**/*.js'],
+    files: ['**/*.js'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
@@ -15,6 +14,9 @@ export default [
         ...globals.browser,
         ...globals.node,
       },
+    },
+    rules: {
+      ...js.configs.recommended.rules,
     },
   },
 ];

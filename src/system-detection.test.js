@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { detectCore, detectMagic, EXTENSIONS_BY_SYSTEM } from './system-detection.js';
+import {
+  detectCore,
+  detectMagic,
+  EXTENSIONS_BY_SYSTEM,
+} from './system-detection.js';
 
 function bytes(values) {
   return Uint8Array.from(values);
