@@ -1,6 +1,6 @@
 {
   "name": "arcade-rom",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,12 +9,20 @@
     "build:site": "vite build --base=/Arcade-ROM/",
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "format": "prettier --write \"{src,index.html,README.md,package.json,.github/workflows/*.yml}\"",
+    "format:check": "prettier --check \"{src,index.html,README.md,package.json,.github/workflows/*.yml}\""
   },
   "dependencies": {
     "jszip": "^3.10.2"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.12",
+    "eslint": "^9.39.5",
+    "prettier": "^3.9.10",
     "vite": "^8.3.5",
     "vitest": "^4.0.18"
   }

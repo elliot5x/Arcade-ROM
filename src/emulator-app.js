@@ -4,17 +4,15 @@
 //        inspeção .zip (JSZip, apenas índice central) -> seleção do binário ->
 //        iframe isolado -> o emulador baixa direto do Blob URL -> cleanup agressivo.
 // ---------------------------------------------------------------------------
-import JSZip from 'jszip';
 import packageJson from '../package.json';
-import { detectCore, EXTENSIONS_BY_SYSTEM } from './system-detection.js';
+import { detectCore } from './system-detection.js';
+import { bootErrorGuidance, bootTimeoutFor, coreNeedsThreads } from './emulator-boot.js';
+import { extractZipEntry, inspectZip, isZipFile } from './zip-inspector.js';
+import { setLiveStatus, updateDragState } from './ui.js';
 
 const APP_VERSION = packageJson.version;
 const DATA_PATH = 'https://cdn.emulatorjs.org/stable/data/';
-const BOOT_TIMEOUT_MS = 20000;
-const CORE_COMPILE_TIMEOUT_MS = 300000;
-const LONG_STAGE = /compilando o núcleo|iniciando o jogo/;
-const MAX_ROM_BYTES = 5 * 1024 * 1024 * 1024;      // 5 GB — Blobs grandes vão para o disco, não estouram o heap
-const MAX_ZIP_ENTRIES = 128;                        // zips bomba / arquivos com milhares de entradas
+const MAX_ROM_BYTES = 5 * 1024 * 1024 * 1024; // 5 GB — Blobs grandes vão para o disco, não estouram o heap
 const PROBE_BYTES = 0x8100;
 const uploadView = document.getElementById('uploadView');
 const emulatorView = document.getElementById('emulatorView');
@@ -35,16 +33,19 @@ const controllerStatus = document.getElementById('controllerStatus');
 const controllerReset = document.getElementById('resetControls');
 
 let activeFrame = null;
-let operation = 0;          // token de geração: invalida trabalho assíncrono órfão
+let operation = 0; // token de geração: invalida trabalho assíncrono órfão
 let dragDepth = 0;
 let pendingFile = null;
 let bootTimeout = null;
 let logStartedAt = 0;
-let gameStarted = false;   // evita que 'emulator-ready' tardio reabra um timeout após o jogo iniciar
-let activeRomUrl = null;   // Blob URL corrente — revogado no cleanup
+let gameStarted = false; // evita que 'emulator-ready' tardio reabra um timeout após o jogo iniciar
+let activeRomUrl = null; // Blob URL corrente — revogado no cleanup
 
 function revokeRomUrl() {
-  if (activeRomUrl) { URL.revokeObjectURL(activeRomUrl); activeRomUrl = null; }
+  if (activeRomUrl) {
+    URL.revokeObjectURL(activeRomUrl);
+    activeRomUrl = null;
+  }
 }
 
 function createRomUrl(blobOrFile) {
@@ -71,11 +72,11 @@ function updateControllerStatus() {
 
 window.addEventListener('gamepadconnected', updateControllerStatus);
 window.addEventListener('gamepaddisconnected', updateControllerStatus);
-window.addEventListener('error', event => {
+window.addEventListener('error', (event) => {
   const detail = event.error?.stack || event.message || 'Erro não identificado na página.';
   appendEmulatorLog(`Erro da página: ${detail}`, 'error');
 });
-window.addEventListener('unhandledrejection', event => {
+window.addEventListener('unhandledrejection', (event) => {
   const reason = event.reason;
   const detail = reason?.stack || reason?.message || String(reason || 'Promessa rejeitada sem motivo.');
   appendEmulatorLog(`Promise rejeitada: ${detail}`, 'error');
@@ -90,9 +91,7 @@ setInterval(updateControllerStatus, 1500);
 // Status / log
 // ---------------------------------------------------------------------------
 function setUploadStatus(message, kind = '') {
-  uploadStatus.textContent = message;
-  uploadStatus.dataset.kind = kind;
-  uploadStatus.setAttribute('aria-live', kind === 'error' ? 'assertive' : 'polite');
+  setLiveStatus(uploadStatus, message, kind);
 }
 
 function resetEmulatorLogs() {
@@ -101,7 +100,9 @@ function resetEmulatorLogs() {
 }
 
 function appendEmulatorLog(message, kind = 'info') {
-  const elapsed = Math.max(0, (performance.now() - logStartedAt) / 1000).toFixed(1).padStart(4, '0');
+  const elapsed = Math.max(0, (performance.now() - logStartedAt) / 1000)
+    .toFixed(1)
+    .padStart(4, '0');
   const entry = document.createElement('li');
   const time = document.createElement('span');
   const text = document.createElement('span');
@@ -139,7 +140,7 @@ function clearBootTimeout() {
 
 function watchBootProgress(frame, stage) {
   clearBootTimeout();
-  const timeout = LONG_STAGE.test(stage) ? CORE_COMPILE_TIMEOUT_MS : BOOT_TIMEOUT_MS;
+  const timeout = bootTimeoutFor(stage);
   bootTimeout = window.setTimeout(() => {
     if (activeFrame !== frame) return;
     bootTimeout = null;
@@ -157,7 +158,11 @@ async function cleanupEmulator(frame, { silent = false } = {}) {
   if (frame) {
     frame.removeEventListener('load', frame.__onLoad || (() => {}));
     frame.__onLoad = null;
-    try { frame.contentWindow?.close?.(); } catch { /* sandbox */ }
+    try {
+      frame.contentWindow?.close?.();
+    } catch {
+      /* sandbox */
+    }
     // FIX: com srcdoc presente, definir src não navega — o srcdoc tem prioridade.
     // Remover o atributo primeiro para realmente liberar o documento do emulador.
     frame.removeAttribute('srcdoc');
@@ -168,7 +173,7 @@ async function cleanupEmulator(frame, { silent = false } = {}) {
   if (!silent) {
     cleanupToast.hidden = false;
     // cede um frame para o GC coletar o heap do WASM antes de reapresentar a UI
-    await new Promise(resolve => requestAnimationFrame(() => resolve()));
+    await new Promise((resolve) => requestAnimationFrame(() => resolve()));
     if (cleanupToast.isConnected) cleanupToast.hidden = true;
   }
   return null;
@@ -182,6 +187,11 @@ async function failEmulatorBoot(frame, message) {
   await cleanupEmulator(frame);
   appendEmulatorLog('Boot cancelado. Escolha a ROM novamente para tentar de novo.', 'error');
   setUploadStatus(message, 'error');
+  const guidance = bootErrorGuidance(message);
+  if (guidance) {
+    appendEmulatorLog(guidance, 'warning');
+    setUploadStatus(`${message} ${guidance}`, 'error');
+  }
   uploadView.hidden = false;
   emulatorView.hidden = true;
   startWithSystemButton.hidden = true;
@@ -193,7 +203,9 @@ function focusEmulator(frame = activeFrame) {
   try {
     frame?.focus();
     frame?.contentWindow?.focus();
-  } catch { /* sandbox */ }
+  } catch {
+    /* sandbox */
+  }
 }
 emulatorHost.addEventListener('pointerdown', () => focusEmulator());
 
@@ -224,56 +236,12 @@ function getCore(fileName, firstBytes = null) {
 // ---------------------------------------------------------------------------
 // Inspeção de arquivo: ZIP -> lista de ROMs candidatas (JSZip)
 // ---------------------------------------------------------------------------
-const ROM_EXTENSIONS = new Set(Object.values(EXTENSIONS_BY_SYSTEM).flat().concat(['iso', 'bin', 'img', 'chd']));
-
-// FIX: .7z não é lido pelo JSZip (só ZIP/PK). Arquivos 7z seguem direto ao EmulatorJS.
-function isZipFile(firstBytes, fileName) {
-  if (firstBytes && firstBytes[0] === 0x50 && firstBytes[1] === 0x4b) return true;
-  return /\.zip$/i.test(fileName || '');
-}
-
-function pickBestZipEntry(entries) {
-  const scored = entries.map(entry => {
-    const extension = entry.name.toLowerCase().split('.').pop();
-    let score = 0;
-    for (const [system, extensions] of Object.entries(EXTENSIONS_BY_SYSTEM)) {
-      if (extensions.includes(extension)) score = Math.max(score, system === 'arcade' ? 1 : 2);
-    }
-    if (['iso', 'bin', 'img', 'chd'].includes(extension)) score = Math.max(score, 1);
-    if (entry.name.startsWith('__MACOSX/') || entry.name.includes('/.')) score = -1;
-    return { entry, extension, score };
-  }).filter(item => item.score >= 0);
-  scored.sort((a, b) => b.score - a.score || b.entry.uncompressedSize - a.entry.uncompressedSize);
-  return scored;
-}
-
-async function inspectZip(blob) {
-  const zip = await JSZip.loadAsync(blob);           // índice central apenas — nada descompactado ainda
-  const entries = Object.values(zip.files).filter(entry => !entry.dir);
-  if (!entries.length) throw new Error('O ZIP não contém arquivos.');
-  if (entries.length > MAX_ZIP_ENTRIES) {
-    throw new Error(`ZIP com ${entries.length} entradas (limite ${MAX_ZIP_ENTRIES}). Use um arquivo direto.`);
-  }
-  const candidates = pickBestZipEntry(entries);
-  const roms = candidates.filter(item => ROM_EXTENSIONS.has(item.extension));
-  const chosen = roms.length ? roms : candidates;
-  if (!chosen.length) throw new Error('Nenhum arquivo de ROM reconhecido dentro do ZIP.');
-
-  if (chosen.length === 1) {
-    return { mode: 'single', entry: chosen[0].entry, total: entries.length };
-  }
-  return { mode: 'menu', entries: chosen, total: entries.length };
-}
-
-async function extractZipEntry(entry) {
-  // Extrai direto como Blob: entradas grandes ficam sob gestão do navegador
-  // (podem ser paginadas para disco) em vez de alocar um Uint8Array inteiro.
-  return entry.async('blob');
-}
-
 async function probeBlob(blob) {
-  try { return new Uint8Array(await blob.slice(0, PROBE_BYTES).arrayBuffer()); }
-  catch { return null; }
+  try {
+    return new Uint8Array(await blob.slice(0, PROBE_BYTES).arrayBuffer());
+  } catch {
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -303,13 +271,17 @@ function renderCatalog(title, items, onPick) {
     play.setAttribute('aria-label', `Jogar ${item.label}`);
     const pick = () => onPick(index);
     play.addEventListener('click', pick);
-    li.addEventListener('keydown', event => {
-      if (event.target !== li) return;     // não duplicar o clique quando o foco está no botão
-      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); pick(); }
+    li.addEventListener('keydown', (event) => {
+      if (event.target !== li) return; // não duplicar o clique quando o foco está no botão
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        pick();
+      }
     });
     li.append(info, play);
     catalogList.append(li);
   });
+  requestAnimationFrame(() => catalogList.querySelector('.catalog-play')?.focus());
 }
 
 function hideCatalog() {
@@ -425,7 +397,7 @@ function emulatorDocument() {
       document.head.append(loader);
     }
     addEventListener('message', onBootMessage);
-  <\/script></body></html>`;
+  <${'/'}script></body></html>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -448,7 +420,7 @@ async function startRom(source, requestedCore = null, { displayName = null } = {
   } else {
     blob = source.blob instanceof Blob ? source.blob : new Blob([source.bytes], { type: 'application/octet-stream' });
     blobName = source.name;
-    displayName = displayName ?? source.displayName ?? null;   // FIX: displayName do objeto era ignorado
+    displayName = displayName ?? source.displayName ?? null; // FIX: displayName do objeto era ignorado
   }
 
   // --- sniff inicial (só o cabeçalho, barato)
@@ -484,11 +456,11 @@ async function startRom(source, requestedCore = null, { displayName = null } = {
       if (inspection.mode === 'menu') {
         renderCatalog(
           `${inspection.total} arquivos no ZIP · ${inspection.entries.length} jogáveis`,
-          inspection.entries.map(item => ({
+          inspection.entries.map((item) => ({
             label: item.entry.name,
-            meta: `${item.extension.toUpperCase()} · descomprimido: ${formatBytes(item.entry.uncompressedSize)}`
+            meta: `${item.extension.toUpperCase()} · descomprimido: ${formatBytes(item.entry.uncompressedSize)}`,
           })),
-          async index => {
+          async (index) => {
             const chosen = inspection.entries[index];
             try {
               setUploadStatus(`Extraindo ${chosen.entry.name}...`, '');
@@ -496,14 +468,14 @@ async function startRom(source, requestedCore = null, { displayName = null } = {
               const extracted = {
                 blob: payload,
                 name: chosen.entry.name.split('/').pop(),
-                displayName: `${blobName} › ${chosen.entry.name}`
+                displayName: `${blobName} › ${chosen.entry.name}`,
               };
               hideCatalog();
               await startRom(extracted, requestedCore);
             } catch (error) {
               setUploadStatus(`Falha ao extrair “${chosen.entry.name}”: ${error.message}`, 'error');
             }
-          }
+          },
         );
         setUploadStatus(`O ZIP contém ${inspection.entries.length} jogos possíveis. Escolha abaixo.`, '');
         return;
@@ -519,16 +491,27 @@ async function startRom(source, requestedCore = null, { displayName = null } = {
       const innerCore = requestedCore || getCore(innerName, innerProbe);
       if (!innerCore) {
         // FIX: antes seguia com core null e quebrava no boot; agora pede o sistema.
-        pendingFile = { blob: payload, name: innerName, displayName: displayName || `${blobName} › ${inspection.entry.name}` };
+        pendingFile = {
+          blob: payload,
+          name: innerName,
+          displayName: displayName || `${blobName} › ${inspection.entry.name}`,
+        };
         startWithSystemButton.hidden = false;
         setUploadStatus(`Não foi possível identificar o sistema de “${innerName}”. Escolha o sistema e inicie.`, '');
         return;
       }
-      return bootWithBlob(payload, innerName, innerCore, currentOperation, displayName || `${blobName} › ${inspection.entry.name}`);
+      return bootWithBlob(
+        payload,
+        innerName,
+        innerCore,
+        currentOperation,
+        displayName || `${blobName} › ${inspection.entry.name}`,
+      );
     }
 
     // --- arquivo direto: zero cópias — o Blob/File é gerenciado pelo navegador
-    if (blob.size > MAX_ROM_BYTES) throw new Error(`Arquivo de ${formatBytes(blob.size)} excede o limite de ${formatBytes(MAX_ROM_BYTES)}.`);
+    if (blob.size > MAX_ROM_BYTES)
+      throw new Error(`Arquivo de ${formatBytes(blob.size)} excede o limite de ${formatBytes(MAX_ROM_BYTES)}.`);
     return bootWithBlob(blob, blobName, core, currentOperation, displayName);
   } catch (error) {
     if (currentOperation === operation) {
@@ -556,8 +539,8 @@ function bootWithBlob(blob, fileName, core, currentOperation, displayName) {
 
   // PSP (PPSSPP) só roda com threads WASM, que exigem SharedArrayBuffer => página com crossOriginIsolated.
   // Sem isso o EmulatorJS falha no meio do boot com erros confusos (ex.: "reading 'AL'"). Falha cedo e explica.
-  if (core === 'psp' && !window.crossOriginIsolated) {
-    const message = 'PSP precisa de isolamento de origem (COOP/COEP) para usar threads. Adicione o coi-serviceworker ao site e recarregue a página duas vezes.';
+  if (coreNeedsThreads(core) && !window.crossOriginIsolated) {
+    const message = `${core.toUpperCase()} precisa de isolamento de origem (COOP/COEP) para usar threads WASM. Adicione o coi-serviceworker ao site e recarregue a página duas vezes.`;
     appendEmulatorLog(message, 'error');
     setUploadStatus(message, 'error');
     uploadView.hidden = false;
@@ -571,7 +554,10 @@ function bootWithBlob(blob, fileName, core, currentOperation, displayName) {
     const frame = document.createElement('iframe');
     frame.className = 'emulator-frame';
     frame.title = `Emulador: ${displayName || fileName}`;
-    frame.setAttribute('sandbox', 'allow-scripts allow-downloads allow-same-origin allow-pointer-lock allow-modals allow-forms');
+    frame.setAttribute(
+      'sandbox',
+      'allow-scripts allow-downloads allow-same-origin allow-pointer-lock allow-modals allow-forms',
+    );
     frame.tabIndex = 0;
     frame.setAttribute('allow', 'autoplay; gamepad; fullscreen; cross-origin-isolated');
     frame.__onLoad = () => {
@@ -579,13 +565,16 @@ function bootWithBlob(blob, fileName, core, currentOperation, displayName) {
       appendEmulatorLog(`Enviando Blob URL da ROM (${formatBytes(blob.size)})...`);
       watchBootProgress(frame, 'aguardando confirmação de recebimento da ROM');
       const romUrl = createRomUrl(blob);
-      frame.contentWindow.postMessage({
-        type: 'boot-rom',
-        romUrl,
-        core,
-        name: fileName,
-        threads: window.crossOriginIsolated === true
-      }, '*');
+      frame.contentWindow.postMessage(
+        {
+          type: 'boot-rom',
+          romUrl,
+          core,
+          name: fileName,
+          threads: window.crossOriginIsolated === true,
+        },
+        '*',
+      );
     };
     frame.addEventListener('load', frame.__onLoad, { once: true });
     frame.srcdoc = emulatorDocument();
@@ -623,8 +612,10 @@ controllerReset?.addEventListener('click', () => {
       const key = localStorage.key(index);
       if (key?.startsWith('ejs-') && key.endsWith('-settings')) keysToRemove.push(key);
     }
-    keysToRemove.forEach(key => localStorage.removeItem(key));
-  } catch { /* armazenamento bloqueado */ }
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
+  } catch {
+    /* armazenamento bloqueado */
+  }
   appendEmulatorLog('Configurações de controle do EmulatorJS restauradas. Reabra a ROM para aplicar.', 'success');
 });
 
@@ -647,7 +638,7 @@ startWithSystemButton.addEventListener('click', () => {
 });
 
 // Mensagens do iframe isolado
-window.addEventListener('message', event => {
+window.addEventListener('message', (event) => {
   if (!activeFrame || event.source !== activeFrame.contentWindow) return;
   const frame = activeFrame;
   switch (event.data?.type) {
@@ -660,7 +651,9 @@ window.addEventListener('message', event => {
       watchBootProgress(frame, 'baixando loader.js');
       break;
     case 'loader-ready':
-      appendEmulatorLog(`Loader carregado; inicializando core ${document.getElementById('romCore').textContent.replace('Núcleo: ', '')}...`);
+      appendEmulatorLog(
+        `Loader carregado; inicializando core ${document.getElementById('romCore').textContent.replace('Núcleo: ', '')}...`,
+      );
       watchBootProgress(frame, 'baixando e compilando o núcleo');
       break;
     case 'emulator-construction-started':
@@ -676,7 +669,10 @@ window.addEventListener('message', event => {
     case 'loader-error':
       clearBootTimeout();
       appendEmulatorLog('Falha ao baixar loader.js. Verifique a conexão com a internet.', 'error');
-      void failEmulatorBoot(frame, 'Não foi possível carregar o EmulatorJS (loader.js). Verifique a conexão e tente novamente.');
+      void failEmulatorBoot(
+        frame,
+        'Não foi possível carregar o EmulatorJS (loader.js). Verifique a conexão e tente novamente.',
+      );
       break;
     case 'game-started':
       gameStarted = true;
@@ -698,25 +694,22 @@ window.addEventListener('message', event => {
 });
 
 // Drag & drop
-document.addEventListener('dragenter', event => {
+document.addEventListener('dragenter', (event) => {
   event.preventDefault();
   dragDepth += 1;
-  dropOverlay.hidden = false;
-  dropzone.classList.add('is-dragging');
+  updateDragState({ overlay: dropOverlay, dropzone }, true);
 });
-document.addEventListener('dragover', event => event.preventDefault());
-document.addEventListener('dragleave', event => {
+document.addEventListener('dragover', (event) => event.preventDefault());
+document.addEventListener('dragleave', (event) => {
   event.preventDefault();
   dragDepth = Math.max(0, dragDepth - 1);
   if (dragDepth === 0) {
-    dropOverlay.hidden = true;
-    dropzone.classList.remove('is-dragging');
+    updateDragState({ overlay: dropOverlay, dropzone }, false);
   }
 });
-document.addEventListener('drop', event => {
+document.addEventListener('drop', (event) => {
   event.preventDefault();
   dragDepth = 0;
-  dropOverlay.hidden = true;
-  dropzone.classList.remove('is-dragging');
+  updateDragState({ overlay: dropOverlay, dropzone }, false);
   if (event.dataTransfer?.files.length) receiveFiles(event.dataTransfer.files);
 });

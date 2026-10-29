@@ -1,174 +1,825 @@
 <!doctype html>
 <html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <script src="./coi-serviceworker.min.js"></script>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#171a18">
-  <meta name="description" content="Carregue e jogue uma ROM local no navegador.">
-  <title>Arcade local | Game &amp; ROM</title>
-  <style>
-    :root{color-scheme:dark;--ink:#f4f7ff;--muted:#98a2b8;--surface:#151927;--surface-raised:#202638;--line:#313a52;--accent:#6ee7d8;--accent-ink:#08231f;--good:#74d99f;--danger:#ff8585;font-family:Inter,"Segoe UI",sans-serif}
-    *{box-sizing:border-box}
-    body{margin:0;min-height:100vh;background:radial-gradient(circle at 15% 0%,rgba(101,83,170,.22),transparent 34%),radial-gradient(circle at 85% 18%,rgba(41,178,173,.14),transparent 28%),linear-gradient(145deg,#090c14,#101421 55%,#090c14);color:var(--ink)}
-    button,input,select{font:inherit}
-    button:focus-visible,input:focus-visible,select:focus-visible,.dropzone:focus-within{outline:3px solid var(--accent);outline-offset:3px}
-    .page{min-height:100vh;display:flex;flex-direction:column}
-    .topbar{height:68px;padding:0 clamp(18px,5vw,72px);display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.07);background:rgba(9,12,20,.82);backdrop-filter:blur(16px)}
-    .brand{display:flex;align-items:center;gap:12px;color:var(--ink);font-weight:800;letter-spacing:.04em}
-    .brand-mark{display:grid;place-items:center;width:34px;height:34px;border:1px solid rgba(110,231,216,.55);border-radius:10px;color:var(--accent);font-size:12px;box-shadow:0 0 24px rgba(110,231,216,.12)}
-    .version-tag{padding:3px 7px;border:1px solid rgba(110,231,216,.3);border-radius:999px;color:var(--accent);font:700 10px ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.04em}
-    .top-note{display:flex;align-items:center;gap:9px;color:var(--muted);font-size:13px}
-    .local-dot{width:8px;height:8px;border-radius:50%;background:var(--good);box-shadow:0 0 12px rgba(116,217,159,.65)}
-    .main{width:min(100% - 36px,1050px);margin:0 auto;padding:clamp(34px,7vh,76px) 0 40px;flex:1;display:flex;flex-direction:column}
-    .eyebrow{margin:0 0 12px;color:var(--accent);font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}
-    h1{margin:0;font-size:clamp(32px,5vw,52px);line-height:1.02;letter-spacing:-.035em;font-weight:800;background:linear-gradient(100deg,#fff 20%,#b9c6dc 85%);background-clip:text;-webkit-background-clip:text;color:transparent}
-    .lede{max-width:620px;margin:16px 0 32px;color:var(--muted);font-size:16px;line-height:1.65}
-    .workspace{min-height:370px;flex:1;display:grid;grid-template-columns:minmax(0,1.35fr) minmax(240px,.65fr);overflow:hidden;border:1px solid rgba(147,163,198,.16);border-radius:18px;background:rgba(20,24,39,.88);box-shadow:0 28px 90px rgba(0,0,0,.38)}
-    .upload-pane{padding:clamp(20px,4vw,42px);display:flex;flex-direction:column;justify-content:center;border-right:1px solid var(--line)}
-    .dropzone{position:relative;min-height:230px;padding:26px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;border:1px dashed #59647e;border-radius:14px;background:linear-gradient(145deg,rgba(37,44,68,.92),rgba(24,29,47,.92));transition:border-color .16s,background .16s,transform .16s;cursor:pointer}
-    .dropzone:hover,.dropzone.is-dragging{border-color:var(--accent);background:linear-gradient(145deg,rgba(43,53,80,.98),rgba(27,43,57,.98));transform:translateY(-2px)}
-    .upload-icon{width:54px;height:54px;display:grid;place-items:center;margin-bottom:16px;border:1px solid rgba(110,231,216,.4);border-radius:16px;color:var(--accent);background:rgba(110,231,216,.06)}
-    .upload-icon svg{width:23px;height:23px}
-    .drop-title{font-size:17px;font-weight:750}
-    .drop-help{margin:7px 0 16px;color:var(--muted);font-size:13px}
-    .file-button,.action-button{min-height:44px;padding:0 20px;display:inline-flex;align-items:center;justify-content:center;gap:9px;border:0;border-radius:9px;background:var(--accent);color:var(--accent-ink);font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 10px 26px rgba(110,231,216,.16);transition:filter .15s,transform .15s}
-    .file-button:hover,.action-button:hover{filter:brightness(1.08);transform:translateY(-1px)}
-    .file-input{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;clip-path:inset(50%)}
-    .side-pane{padding:clamp(22px,3vw,34px);display:flex;flex-direction:column;justify-content:center;gap:22px}
-    .side-title{margin:0 0 8px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
-    .side-copy{margin:0;color:var(--muted);font-size:13px;line-height:1.55}
-    .core-label{display:block;margin:0 0 8px;color:var(--muted);font-size:12px}
-    select{width:100%;height:42px;padding:0 12px;border:1px solid var(--line);border-radius:3px;background:var(--surface-raised);color:var(--ink)}
-    .formats{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}
-    .format{padding:5px 8px;border:1px solid var(--line);color:#d2d1c6;font:700 10px ui-monospace,SFMono-Regular,Consolas,monospace}
-    .system-start{width:100%;margin-top:10px}
-    .status{min-height:20px;margin:16px 0 0;color:var(--muted);font-size:12px}
-    .status[data-kind=error]{color:var(--danger)}
-    .status[data-kind=success]{color:var(--good)}
-    .progress-track{display:block;width:100%;height:7px;margin-top:12px;overflow:hidden;border:0;border-radius:0;background:#41463e;accent-color:var(--accent)}
-    .progress-track::-webkit-progress-bar{background:#41463e}
-    .progress-track::-webkit-progress-value{background:var(--accent)}
-    .progress-track::-moz-progress-bar{background:var(--accent)}
-    .log-console{margin-top:12px;border:1px solid #394038;background:#101310;color:#d4decf;font:12px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace}
-    .log-heading{height:34px;padding:0 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #30372f;color:#aeb8a9;font-size:10px;font-weight:800;letter-spacing:.08em}
-    .log-indicator{width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 8px #8dc58a77}
-    .log-list{max-height:150px;min-height:44px;margin:0;padding:8px 12px;overflow:auto;list-style:none;scrollbar-color:#555d50 #101310;scrollbar-width:thin}
-    .log-list li{display:grid;grid-template-columns:52px minmax(0,1fr);gap:10px;overflow-wrap:anywhere}
-    .log-time{color:#8f9b85}
-    .log-message{color:#e0e5dc}
-    .log-list li[data-kind=warning] .log-message{color:var(--accent)}
-    .log-list li[data-kind=error] .log-message{color:var(--danger)}
-    .log-list li[data-kind=success] .log-message{color:var(--good)}
-    .emulator-view{width:100%;padding:20px;border:1px solid var(--line);background:#151715}
-    .emulator-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px}
-    .rom-label{min-width:0;display:flex;flex-direction:column;gap:4px}
-    .rom-label strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
-    .rom-label span{color:var(--muted);font-size:11px}
-    .remove-button{flex:none;min-height:38px;padding:0 12px;border:1px solid #78776a;border-radius:3px;background:transparent;color:var(--ink);font-size:12px;font-weight:700;cursor:pointer}
-    .remove-button:hover{border-color:var(--accent);color:var(--accent)}
-    .controller-bar{margin-bottom:12px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);background:#111510;font-size:12px}
-    .controller-bar>div:first-child{min-width:0;display:flex;align-items:center;gap:8px}
-    #controllerStatus{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    #controllerStatus[data-connected=true]{color:var(--good)}
-    .controller-dot{width:8px;height:8px;flex:none;border-radius:50%;background:#777}
-    #controllerStatus[data-connected=true]+*{color:var(--good)}
-    .controller-actions{display:flex;align-items:center;gap:10px;color:var(--muted);text-align:right}
-    .controller-actions span{font-size:11px}
-    .emulator-frame{display:block;width:100%;height:min(68vh,720px);min-height:320px;border:0;background:#000}
-    .emulator-status{margin:10px 0 0;color:var(--muted);font-size:12px}
-    .footer{padding:0 20px 22px;text-align:center;color:#82857c;font-size:11px}
-    .catalog{margin-top:26px;border:1px solid var(--line);background:#1b1e1bd9;box-shadow:0 24px 70px #0003}
-    .catalog-heading{padding:16px 22px;border-bottom:1px solid var(--line)}
-    .catalog-heading .side-copy{margin:4px 0 0}
-    .catalog-list{margin:0;padding:10px;list-style:none}
-    .catalog-item{display:flex;align-items:center;gap:14px;padding:11px 12px;border:1px solid transparent;cursor:pointer}
-    .catalog-item:hover,.catalog-item:focus-visible{border-color:var(--accent);background:#26291f;outline:none}
-    .catalog-item+.catalog-item{border-top-color:#2b2f28}
-    .catalog-thumb{flex:none;width:52px;height:52px;object-fit:cover;background:#0e100e;border:1px solid var(--line)}
-    .catalog-info{min-width:0;flex:1;display:flex;flex-direction:column;gap:3px}
-    .catalog-name{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .catalog-meta{color:var(--muted);font-size:11px}
-    .catalog-play{flex:none;padding:7px 14px;border:0;border-radius:3px;background:var(--accent);color:var(--accent-ink);font-size:12px;font-weight:800;cursor:pointer}
-.catalog-play[disabled]{opacity:.55;cursor:wait}
-    .drop-overlay{position:fixed;inset:12px;z-index:5;display:grid;place-items:center;border:2px dashed var(--accent);background:#171a18ed;color:var(--ink);font-size:clamp(20px,4vw,34px);font-weight:800;pointer-events:none}
-    [hidden]{display:none!important}
-    @media(max-width:720px){.controller-bar{align-items:flex-start;flex-direction:column}.controller-actions{width:100%;justify-content:space-between;text-align:left}.controller-actions span{max-width:240px}.catalog-item{flex-wrap:wrap}.drop-overlay{inset:8px}.topbar{height:58px}.top-note{font-size:11px}.main{width:min(100% - 24px,560px);padding-top:34px}.workspace{grid-template-columns:1fr}.upload-pane{border-right:0;border-bottom:1px solid var(--line)}.side-pane{display:grid;grid-template-columns:1fr 1fr;gap:20px}.side-pane>section:last-child{grid-column:1/-1}.emulator-view{padding:12px}.emulator-toolbar{align-items:flex-start}.remove-button{font-size:11px}.emulator-frame{height:62vh;min-height:260px}}
-    @media(max-width:420px){.side-pane{grid-template-columns:1fr}.side-pane>section:last-child{grid-column:auto}.emulator-toolbar{flex-wrap:wrap}.remove-button{width:100%}.emulator-frame{min-height:230px}}
-  </style>
-</head>
-<body>
-  <div class="page">
-    <header class="topbar">
-      <div class="brand"><span class="brand-mark" aria-hidden="true">AR</span><span>ARCADE ROM</span><span id="appVersion" class="version-tag">v1.0.3</span></div>
-      <div class="top-note"><span class="local-dot" aria-hidden="true"></span><span>ROM carregada localmente</span></div>
-    </header>
-    <main class="main">
-      <p class="eyebrow">Emulador no navegador</p>
-      <h1>Escolha uma ROM<br>e comece a jogar.</h1>
-      <p class="lede">Selecione uma ROM ou arraste o arquivo para esta página. Todo o processamento acontece localmente, sem enviar o jogo para um servidor.</p>
-      <section id="uploadView" class="workspace" aria-label="Carregar uma ROM">
-        <div class="upload-pane">
-          <label id="dropzone" class="dropzone" for="romInput">
-            <input id="romInput" class="file-input" type="file" accept=".nes,.unf,.unif,.smc,.sfc,.fig,.swc,.gb,.gbc,.gba,.nds,.n64,.z64,.v64,.pbp,.chd,.cue,.ccd,.m3u,.iso,.img,.bin,.gen,.md,.smd,.32x,.sms,.gg,.a26,.a52,.a78,.lnx,.jag,.vb,.d64,.d71,.d81,.t64,.prg,.adf,.pce,.pcfx,.ngp,.ws,.wsc,.col,.zip,.7z,.rar" aria-describedby="uploadStatus fileHelp">
-            <span class="upload-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0L7 9m5-5 5 5"/><path d="M4 16.5v2A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5v-2"/></svg></span>
-            <span class="drop-title">Solte seu jogo aqui</span>
-            <span id="fileHelp" class="drop-help">ROM, ISO, ZIP, 7Z ou RAR compatível, do seu dispositivo</span>
-            <span class="file-button">Selecionar ROM</span>
-          </label>
-          <p id="uploadStatus" class="status" role="status" aria-live="polite">Nenhuma ROM carregada.</p>
-          <progress id="romProgress" class="progress-track" max="100" value="0" aria-label="Leitura do arquivo" hidden></progress>
+  <head>
+    <meta charset="UTF-8" />
+    <script src="./coi-serviceworker.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#171a18" />
+    <meta name="description" content="Carregue e jogue uma ROM local no navegador." />
+    <title>Arcade local | Game &amp; ROM</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --ink: #f4f7ff;
+        --muted: #98a2b8;
+        --surface: #151927;
+        --surface-raised: #202638;
+        --line: #313a52;
+        --accent: #6ee7d8;
+        --accent-ink: #08231f;
+        --good: #74d99f;
+        --danger: #ff8585;
+        font-family: Inter, 'Segoe UI', sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at 15% 0%, rgba(101, 83, 170, 0.22), transparent 34%),
+          radial-gradient(circle at 85% 18%, rgba(41, 178, 173, 0.14), transparent 28%),
+          linear-gradient(145deg, #090c14, #101421 55%, #090c14);
+        color: var(--ink);
+      }
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+      button:focus-visible,
+      input:focus-visible,
+      select:focus-visible,
+      .dropzone:focus-within {
+        outline: 3px solid var(--accent);
+        outline-offset: 3px;
+      }
+      .page {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      .topbar {
+        height: 68px;
+        padding: 0 clamp(18px, 5vw, 72px);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+        background: rgba(9, 12, 20, 0.82);
+        backdrop-filter: blur(16px);
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: var(--ink);
+        font-weight: 800;
+        letter-spacing: 0.04em;
+      }
+      .brand-mark {
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        border: 1px solid rgba(110, 231, 216, 0.55);
+        border-radius: 10px;
+        color: var(--accent);
+        font-size: 12px;
+        box-shadow: 0 0 24px rgba(110, 231, 216, 0.12);
+      }
+      .version-tag {
+        padding: 3px 7px;
+        border: 1px solid rgba(110, 231, 216, 0.3);
+        border-radius: 999px;
+        color: var(--accent);
+        font:
+          700 10px ui-monospace,
+          SFMono-Regular,
+          Consolas,
+          monospace;
+        letter-spacing: 0.04em;
+      }
+      .top-note {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .local-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--good);
+        box-shadow: 0 0 12px rgba(116, 217, 159, 0.65);
+      }
+      .main {
+        width: min(100% - 36px, 1050px);
+        margin: 0 auto;
+        padding: clamp(34px, 7vh, 76px) 0 40px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+      .eyebrow {
+        margin: 0 0 12px;
+        color: var(--accent);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+      h1 {
+        margin: 0;
+        font-size: clamp(32px, 5vw, 52px);
+        line-height: 1.02;
+        letter-spacing: -0.035em;
+        font-weight: 800;
+        background: linear-gradient(100deg, #fff 20%, #b9c6dc 85%);
+        background-clip: text;
+        -webkit-background-clip: text;
+        color: transparent;
+      }
+      .lede {
+        max-width: 620px;
+        margin: 16px 0 32px;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.65;
+      }
+      .workspace {
+        min-height: 370px;
+        flex: 1;
+        display: grid;
+        grid-template-columns: minmax(0, 1.35fr) minmax(240px, 0.65fr);
+        overflow: hidden;
+        border: 1px solid rgba(147, 163, 198, 0.16);
+        border-radius: 18px;
+        background: rgba(20, 24, 39, 0.88);
+        box-shadow: 0 28px 90px rgba(0, 0, 0, 0.38);
+      }
+      .upload-pane {
+        padding: clamp(20px, 4vw, 42px);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        border-right: 1px solid var(--line);
+      }
+      .dropzone {
+        position: relative;
+        min-height: 230px;
+        padding: 26px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        border: 1px dashed #59647e;
+        border-radius: 14px;
+        background: linear-gradient(145deg, rgba(37, 44, 68, 0.92), rgba(24, 29, 47, 0.92));
+        transition:
+          border-color 0.16s,
+          background 0.16s,
+          transform 0.16s;
+        cursor: pointer;
+      }
+      .dropzone:hover,
+      .dropzone.is-dragging {
+        border-color: var(--accent);
+        background: linear-gradient(145deg, rgba(43, 53, 80, 0.98), rgba(27, 43, 57, 0.98));
+        transform: translateY(-2px);
+      }
+      .upload-icon {
+        width: 54px;
+        height: 54px;
+        display: grid;
+        place-items: center;
+        margin-bottom: 16px;
+        border: 1px solid rgba(110, 231, 216, 0.4);
+        border-radius: 16px;
+        color: var(--accent);
+        background: rgba(110, 231, 216, 0.06);
+      }
+      .upload-icon svg {
+        width: 23px;
+        height: 23px;
+      }
+      .drop-title {
+        font-size: 17px;
+        font-weight: 750;
+      }
+      .drop-help {
+        margin: 7px 0 16px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .file-button,
+      .action-button {
+        min-height: 44px;
+        padding: 0 20px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 9px;
+        border: 0;
+        border-radius: 9px;
+        background: var(--accent);
+        color: var(--accent-ink);
+        font-size: 13px;
+        font-weight: 800;
+        cursor: pointer;
+        box-shadow: 0 10px 26px rgba(110, 231, 216, 0.16);
+        transition:
+          filter 0.15s,
+          transform 0.15s;
+      }
+      .file-button:hover,
+      .action-button:hover {
+        filter: brightness(1.08);
+        transform: translateY(-1px);
+      }
+      .file-input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        clip-path: inset(50%);
+      }
+      .side-pane {
+        padding: clamp(22px, 3vw, 34px);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 22px;
+      }
+      .side-title {
+        margin: 0 0 8px;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .side-copy {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+      .core-label {
+        display: block;
+        margin: 0 0 8px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      select {
+        width: 100%;
+        height: 42px;
+        padding: 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 3px;
+        background: var(--surface-raised);
+        color: var(--ink);
+      }
+      .formats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        margin-top: 12px;
+      }
+      .format {
+        padding: 5px 8px;
+        border: 1px solid var(--line);
+        color: #d2d1c6;
+        font:
+          700 10px ui-monospace,
+          SFMono-Regular,
+          Consolas,
+          monospace;
+      }
+      .system-start {
+        width: 100%;
+        margin-top: 10px;
+      }
+      .status {
+        min-height: 20px;
+        margin: 16px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .status[data-kind='error'] {
+        color: var(--danger);
+      }
+      .status[data-kind='success'] {
+        color: var(--good);
+      }
+      .progress-track {
+        display: block;
+        width: 100%;
+        height: 7px;
+        margin-top: 12px;
+        overflow: hidden;
+        border: 0;
+        border-radius: 0;
+        background: #41463e;
+        accent-color: var(--accent);
+      }
+      .progress-track::-webkit-progress-bar {
+        background: #41463e;
+      }
+      .progress-track::-webkit-progress-value {
+        background: var(--accent);
+      }
+      .progress-track::-moz-progress-bar {
+        background: var(--accent);
+      }
+      .log-console {
+        margin-top: 12px;
+        border: 1px solid #394038;
+        background: #101310;
+        color: #d4decf;
+        font:
+          12px/1.55 ui-monospace,
+          SFMono-Regular,
+          Consolas,
+          monospace;
+      }
+      .log-heading {
+        height: 34px;
+        padding: 0 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border-bottom: 1px solid #30372f;
+        color: #aeb8a9;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+      }
+      .log-indicator {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--good);
+        box-shadow: 0 0 8px #8dc58a77;
+      }
+      .log-list {
+        max-height: 150px;
+        min-height: 44px;
+        margin: 0;
+        padding: 8px 12px;
+        overflow: auto;
+        list-style: none;
+        scrollbar-color: #555d50 #101310;
+        scrollbar-width: thin;
+      }
+      .log-list li {
+        display: grid;
+        grid-template-columns: 52px minmax(0, 1fr);
+        gap: 10px;
+        overflow-wrap: anywhere;
+      }
+      .log-time {
+        color: #8f9b85;
+      }
+      .log-message {
+        color: #e0e5dc;
+      }
+      .log-list li[data-kind='warning'] .log-message {
+        color: var(--accent);
+      }
+      .log-list li[data-kind='error'] .log-message {
+        color: var(--danger);
+      }
+      .log-list li[data-kind='success'] .log-message {
+        color: var(--good);
+      }
+      .emulator-view {
+        width: 100%;
+        padding: 20px;
+        border: 1px solid var(--line);
+        background: #151715;
+      }
+      .emulator-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 14px;
+      }
+      .rom-label {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .rom-label strong {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 14px;
+      }
+      .rom-label span {
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .remove-button {
+        flex: none;
+        min-height: 38px;
+        padding: 0 12px;
+        border: 1px solid #78776a;
+        border-radius: 3px;
+        background: transparent;
+        color: var(--ink);
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .remove-button:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .controller-bar {
+        margin-bottom: 12px;
+        padding: 10px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border: 1px solid var(--line);
+        background: #111510;
+        font-size: 12px;
+      }
+      .controller-bar > div:first-child {
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      #controllerStatus {
+        color: var(--muted);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      #controllerStatus[data-connected='true'] {
+        color: var(--good);
+      }
+      .controller-dot {
+        width: 8px;
+        height: 8px;
+        flex: none;
+        border-radius: 50%;
+        background: #777;
+      }
+      #controllerStatus[data-connected='true'] + * {
+        color: var(--good);
+      }
+      .controller-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--muted);
+        text-align: right;
+      }
+      .controller-actions span {
+        font-size: 11px;
+      }
+      .emulator-frame {
+        display: block;
+        width: 100%;
+        height: min(68vh, 720px);
+        min-height: 320px;
+        border: 0;
+        background: #000;
+      }
+      .emulator-status {
+        margin: 10px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .footer {
+        padding: 0 20px 22px;
+        text-align: center;
+        color: #82857c;
+        font-size: 11px;
+      }
+      .catalog {
+        margin-top: 26px;
+        border: 1px solid var(--line);
+        background: #1b1e1bd9;
+        box-shadow: 0 24px 70px #0003;
+      }
+      .catalog-heading {
+        padding: 16px 22px;
+        border-bottom: 1px solid var(--line);
+      }
+      .catalog-heading .side-copy {
+        margin: 4px 0 0;
+      }
+      .catalog-list {
+        margin: 0;
+        padding: 10px;
+        list-style: none;
+      }
+      .catalog-item {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 11px 12px;
+        border: 1px solid transparent;
+        cursor: pointer;
+      }
+      .catalog-item:hover,
+      .catalog-item:focus-visible {
+        border-color: var(--accent);
+        background: #26291f;
+        outline: none;
+      }
+      .catalog-item + .catalog-item {
+        border-top-color: #2b2f28;
+      }
+      .catalog-thumb {
+        flex: none;
+        width: 52px;
+        height: 52px;
+        object-fit: cover;
+        background: #0e100e;
+        border: 1px solid var(--line);
+      }
+      .catalog-info {
+        min-width: 0;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+      .catalog-name {
+        font-size: 14px;
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .catalog-meta {
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .catalog-play {
+        flex: none;
+        padding: 7px 14px;
+        border: 0;
+        border-radius: 3px;
+        background: var(--accent);
+        color: var(--accent-ink);
+        font-size: 12px;
+        font-weight: 800;
+        cursor: pointer;
+      }
+      .catalog-play[disabled] {
+        opacity: 0.55;
+        cursor: wait;
+      }
+      .drop-overlay {
+        position: fixed;
+        inset: 12px;
+        z-index: 5;
+        display: grid;
+        place-items: center;
+        border: 2px dashed var(--accent);
+        background: #171a18ed;
+        color: var(--ink);
+        font-size: clamp(20px, 4vw, 34px);
+        font-weight: 800;
+        pointer-events: none;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      @media (max-width: 720px) {
+        .controller-bar {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+        .controller-actions {
+          width: 100%;
+          justify-content: space-between;
+          text-align: left;
+        }
+        .controller-actions span {
+          max-width: 240px;
+        }
+        .catalog-item {
+          flex-wrap: wrap;
+        }
+        .drop-overlay {
+          inset: 8px;
+        }
+        .topbar {
+          height: 58px;
+        }
+        .top-note {
+          font-size: 11px;
+        }
+        .main {
+          width: min(100% - 24px, 560px);
+          padding-top: 34px;
+        }
+        .workspace {
+          grid-template-columns: 1fr;
+        }
+        .upload-pane {
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+        .side-pane {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 20px;
+        }
+        .side-pane > section:last-child {
+          grid-column: 1/-1;
+        }
+        .emulator-view {
+          padding: 12px;
+        }
+        .emulator-toolbar {
+          align-items: flex-start;
+        }
+        .remove-button {
+          font-size: 11px;
+        }
+        .emulator-frame {
+          height: 62vh;
+          min-height: 260px;
+        }
+      }
+      @media (max-width: 420px) {
+        .side-pane {
+          grid-template-columns: 1fr;
+        }
+        .side-pane > section:last-child {
+          grid-column: auto;
+        }
+        .emulator-toolbar {
+          flex-wrap: wrap;
+        }
+        .remove-button {
+          width: 100%;
+        }
+        .emulator-frame {
+          min-height: 230px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">AR</span><span>ARCADE ROM</span
+          ><span id="appVersion" class="version-tag">v1.0.3</span>
         </div>
-        <aside class="side-pane">
-          <section>
-            <h2 class="side-title">Arquivo</h2>
-            <p class="side-copy">Um arquivo por vez. A extensão não é bloqueada; o EmulatorJS tenta abrir formatos compatíveis com o sistema escolhido.</p>
-            <div class="formats" aria-label="Exemplos de formatos"><span class="format">ROM</span><span class="format">ZIP</span><span class="format">DISC</span></div>
-          </section>
-          <section>
-            <label class="core-label" for="systemSelect">Sistema do jogo</label>
-            <select id="systemSelect">
-              <option value="auto">Automático quando reconhecido</option><option value="nes">Nintendo (NES)</option><option value="snes">Super Nintendo</option><option value="gb">Game Boy / Color</option><option value="gba">Game Boy Advance</option><option value="nds">Nintendo DS</option><option value="n64">Nintendo 64</option><option value="psx">PlayStation</option><option value="psp">PlayStation Portable</option><option value="3do">3DO</option><option value="arcade">Arcade</option><option value="mame2003">Arcade (MAME 2003)</option><option value="segaMD">Sega Mega Drive</option><option value="segaCD">Sega CD</option><option value="sega32x">Sega 32X</option><option value="segaMS">Sega Master System</option><option value="segaGG">Sega Game Gear</option><option value="segaSaturn">Sega Saturn</option><option value="atari2600">Atari 2600</option><option value="atari5200">Atari 5200</option><option value="atari7800">Atari 7800</option><option value="lynx">Atari Lynx</option><option value="jaguar">Atari Jaguar</option><option value="vb">Virtual Boy</option><option value="c64">Commodore 64</option><option value="c128">Commodore 128</option><option value="amiga">Amiga</option><option value="coleco">ColecoVision</option><option value="pce">PC Engine</option><option value="pcfx">PC-FX</option><option value="ngp">Neo Geo Pocket</option><option value="ws">WonderSwan</option><option value="dos">DOS</option>
-            </select>
-            <button id="startWithSystem" class="action-button system-start" type="button" hidden>Iniciar com este sistema</button>
-            <p class="side-copy">ZIP, imagens de disco e extensões ambíguas precisam do sistema correto. Arquivos 7Z e RAR não são descompactados. Alguns jogos também exigem BIOS ou arquivos auxiliares.</p>
-          </section>
-          <section>
-            <h2 class="side-title">Privacidade</h2>
-            <p class="side-copy">O arquivo selecionado é enviado somente ao emulador desta sessão. Remover a ROM encerra o emulador e descarta o contexto carregado.</p>
-          </section>
-        </aside>
-      </section>
-      <section id="catalogSection" class="catalog" aria-label="Catálogo rápido" hidden>
-        <div class="catalog-heading">
-          <h2 class="side-title">Jogos encontrados no arquivo</h2>
-          <p id="catalogSummary" class="side-copy"></p>
+        <div class="top-note">
+          <span class="local-dot" aria-hidden="true"></span><span>ROM carregada localmente</span>
         </div>
-        <ul id="catalogList" class="catalog-list"></ul>
-      </section>
-      <section id="emulatorView" class="emulator-view" aria-label="Emulador" hidden>
-        <div class="emulator-toolbar">
-          <div class="rom-label"><strong id="romName"></strong><span id="romCore"></span></div>
-          <button id="removeRom" class="remove-button" type="button">Remover / trocar ROM</button>
-        </div>
-        <div class="controller-bar" aria-label="Controles">
-          <div><span class="controller-dot" aria-hidden="true"></span><strong>Controle</strong><span id="controllerStatus">Nenhum controle detectado</span></div>
-          <div class="controller-actions">
-            <span>Remapear em Configurações → Controles. O perfil fica salvo para outros jogos.</span>
-            <button id="resetControls" class="remove-button" type="button">Restaurar padrão</button>
+      </header>
+      <main class="main">
+        <p class="eyebrow">Emulador no navegador</p>
+        <h1>Escolha uma ROM<br />e comece a jogar.</h1>
+        <p class="lede">
+          Selecione uma ROM ou arraste o arquivo para esta página. Todo o processamento acontece localmente, sem enviar
+          o jogo para um servidor.
+        </p>
+        <section id="uploadView" class="workspace" aria-label="Carregar uma ROM">
+          <div class="upload-pane">
+            <label id="dropzone" class="dropzone" for="romInput">
+              <input
+                id="romInput"
+                class="file-input"
+                type="file"
+                accept=".nes,.unf,.unif,.smc,.sfc,.fig,.swc,.gb,.gbc,.gba,.nds,.n64,.z64,.v64,.pbp,.chd,.cue,.ccd,.m3u,.iso,.img,.bin,.gen,.md,.smd,.32x,.sms,.gg,.a26,.a52,.a78,.lnx,.jag,.vb,.d64,.d71,.d81,.t64,.prg,.adf,.pce,.pcfx,.ngp,.ws,.wsc,.col,.zip,.7z,.rar"
+                aria-describedby="uploadStatus fileHelp"
+              />
+              <span class="upload-icon" aria-hidden="true"
+                ><svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M12 16V4m0 0L7 9m5-5 5 5" />
+                  <path d="M4 16.5v2A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5v-2" /></svg
+              ></span>
+              <span class="drop-title">Solte seu jogo aqui</span>
+              <span id="fileHelp" class="drop-help">ROM, ISO, ZIP, 7Z ou RAR compatível, do seu dispositivo</span>
+              <span class="file-button">Selecionar ROM</span>
+            </label>
+            <p id="uploadStatus" class="status" role="status" aria-live="polite">Nenhuma ROM carregada.</p>
+            <progress
+              id="romProgress"
+              class="progress-track"
+              max="100"
+              value="0"
+              aria-label="Leitura do arquivo"
+              hidden
+            ></progress>
           </div>
-        </div>
-        <div id="emulatorHost"></div>
-        <section class="log-console" aria-label="Histórico do emulador">
-          <div class="log-heading"><span class="log-indicator" aria-hidden="true"></span><span>BOOT LOG</span></div>
-          <ol id="emulatorLogs" class="log-list" role="log" aria-live="polite" aria-relevant="additions"></ol>
+          <aside class="side-pane">
+            <section>
+              <h2 class="side-title">Arquivo</h2>
+              <p class="side-copy">
+                Um arquivo por vez. A extensão não é bloqueada; o EmulatorJS tenta abrir formatos compatíveis com o
+                sistema escolhido.
+              </p>
+              <div class="formats" aria-label="Exemplos de formatos">
+                <span class="format">ROM</span><span class="format">ZIP</span><span class="format">DISC</span>
+              </div>
+            </section>
+            <section>
+              <label class="core-label" for="systemSelect">Sistema do jogo</label>
+              <select id="systemSelect">
+                <option value="auto">Automático quando reconhecido</option>
+                <option value="nes">Nintendo (NES)</option>
+                <option value="snes">Super Nintendo</option>
+                <option value="gb">Game Boy / Color</option>
+                <option value="gba">Game Boy Advance</option>
+                <option value="nds">Nintendo DS</option>
+                <option value="n64">Nintendo 64</option>
+                <option value="psx">PlayStation</option>
+                <option value="psp">PlayStation Portable</option>
+                <option value="3do">3DO</option>
+                <option value="arcade">Arcade</option>
+                <option value="mame2003">Arcade (MAME 2003)</option>
+                <option value="segaMD">Sega Mega Drive</option>
+                <option value="segaCD">Sega CD</option>
+                <option value="sega32x">Sega 32X</option>
+                <option value="segaMS">Sega Master System</option>
+                <option value="segaGG">Sega Game Gear</option>
+                <option value="segaSaturn">Sega Saturn</option>
+                <option value="atari2600">Atari 2600</option>
+                <option value="atari5200">Atari 5200</option>
+                <option value="atari7800">Atari 7800</option>
+                <option value="lynx">Atari Lynx</option>
+                <option value="jaguar">Atari Jaguar</option>
+                <option value="vb">Virtual Boy</option>
+                <option value="c64">Commodore 64</option>
+                <option value="c128">Commodore 128</option>
+                <option value="amiga">Amiga</option>
+                <option value="coleco">ColecoVision</option>
+                <option value="pce">PC Engine</option>
+                <option value="pcfx">PC-FX</option>
+                <option value="ngp">Neo Geo Pocket</option>
+                <option value="ws">WonderSwan</option>
+                <option value="dos">DOS</option>
+              </select>
+              <button id="startWithSystem" class="action-button system-start" type="button" hidden>
+                Iniciar com este sistema
+              </button>
+              <p class="side-copy">
+                ZIP, imagens de disco e extensões ambíguas precisam do sistema correto. Arquivos 7Z e RAR não são
+                descompactados. Alguns jogos também exigem BIOS ou arquivos auxiliares.
+              </p>
+            </section>
+            <section>
+              <h2 class="side-title">Privacidade</h2>
+              <p class="side-copy">
+                O arquivo selecionado é enviado somente ao emulador desta sessão. Remover a ROM encerra o emulador e
+                descarta o contexto carregado.
+              </p>
+            </section>
+          </aside>
         </section>
-      </section>
-    </main>
-    <footer class="footer">EmulatorJS é carregado sob demanda para executar o jogo neste navegador.</footer>
-  </div>
-  <div id="dropOverlay" class="drop-overlay" hidden>Solte para iniciar a nova ROM</div>
-  <div id="cleanupToast" class="drop-overlay" hidden style="font-size:15px;letter-spacing:.05em">Liberando memória do emulador…</div>
-  <script type="module" src="./src/emulator-app.js"></script>
-</body>
+        <section id="catalogSection" class="catalog" aria-label="Catálogo rápido" hidden>
+          <div class="catalog-heading">
+            <h2 class="side-title">Jogos encontrados no arquivo</h2>
+            <p id="catalogSummary" class="side-copy"></p>
+          </div>
+          <ul id="catalogList" class="catalog-list"></ul>
+        </section>
+        <section id="emulatorView" class="emulator-view" aria-label="Emulador" hidden>
+          <div class="emulator-toolbar">
+            <div class="rom-label"><strong id="romName"></strong><span id="romCore"></span></div>
+            <button id="removeRom" class="remove-button" type="button">Remover / trocar ROM</button>
+          </div>
+          <div class="controller-bar" aria-label="Controles">
+            <div>
+              <span class="controller-dot" aria-hidden="true"></span><strong>Controle</strong
+              ><span id="controllerStatus">Nenhum controle detectado</span>
+            </div>
+            <div class="controller-actions">
+              <span>Remapear em Configurações → Controles. O perfil fica salvo para outros jogos.</span>
+              <button id="resetControls" class="remove-button" type="button">Restaurar padrão</button>
+            </div>
+          </div>
+          <div id="emulatorHost"></div>
+          <section class="log-console" aria-label="Histórico do emulador">
+            <div class="log-heading"><span class="log-indicator" aria-hidden="true"></span><span>BOOT LOG</span></div>
+            <ol id="emulatorLogs" class="log-list" role="log" aria-live="polite" aria-relevant="additions"></ol>
+          </section>
+        </section>
+      </main>
+      <footer class="footer">EmulatorJS é carregado sob demanda para executar o jogo neste navegador.</footer>
+    </div>
+    <div id="dropOverlay" class="drop-overlay" hidden>Solte para iniciar a nova ROM</div>
+    <div id="cleanupToast" class="drop-overlay" hidden style="font-size: 15px; letter-spacing: 0.05em">
+      Liberando memória do emulador…
+    </div>
+    <script type="module" src="./src/emulator-app.js"></script>
+  </body>
 </html>

@@ -45,4 +45,11 @@ describe('detectCore', () => {
     expect(EXTENSIONS_BY_SYSTEM.nes).toContain('nes');
     expect(EXTENSIONS_BY_SYSTEM.psx).toContain('chd');
   });
+
+  it('requires manual selection for ambiguous file names', () => {
+    expect(detectCore('disc.bin')).toBe('psx');
+    expect(detectCore('archive.zip')).toBeNull();
+    expect(detectCore('archive.7z')).toBeNull();
+    expect(detectCore('archive.rar')).toBeNull();
+  });
 });
