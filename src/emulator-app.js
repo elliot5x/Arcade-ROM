@@ -10,6 +10,7 @@ import packageJson from '../package.json';
 const APP_VERSION = packageJson.version;
 const DATA_PATH = 'https://cdn.emulatorjs.org/stable/data/';
 const BOOT_TIMEOUT_MS = 20000;
+const CORE_COMPILE_TIMEOUT_MS = 300000;
 const MAX_ROM_BYTES = 5 * 1024 * 1024 * 1024;      // 5 GB — Blobs grandes vão para o disco, não estouram o heap
 const MAX_ZIP_ENTRIES = 128;                        // zips bomba / arquivos com milhares de entradas
 const PROBE_BYTES = 512;                            // sniff de assinatura mágica no cabeçalho
@@ -177,12 +178,14 @@ function clearBootTimeout() {
 
 function watchBootProgress(frame, stage) {
   clearBootTimeout();
+  const timeout = stage.includes('compilando o núcleo') ? CORE_COMPILE_TIMEOUT_MS : BOOT_TIMEOUT_MS;
   bootTimeout = window.setTimeout(() => {
     if (activeFrame !== frame) return;
     bootTimeout = null;
-    appendEmulatorLog(`Tempo esgotado (20s) na etapa: ${stage}.`, 'error');
-    failEmulatorBoot(frame, `O emulador não respondeu durante a etapa “${stage}” em 20 segundos.`);
-  }, BOOT_TIMEOUT_MS);
+    const seconds = Math.round(timeout / 1000);
+    appendEmulatorLog(`Tempo esgotado (${seconds}s) na etapa: ${stage}.`, 'error');
+    failEmulatorBoot(frame, `O emulador não respondeu durante a etapa “${stage}” em ${seconds} segundos.`);
+  }, timeout);
 }
 
 // Chamado sempre que o emulador sai de cena (erro, troca ou remoção de ROM).
