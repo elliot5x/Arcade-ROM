@@ -110,10 +110,10 @@
       <section id="uploadView" class="workspace" aria-label="Carregar uma ROM">
         <div class="upload-pane">
           <label id="dropzone" class="dropzone" for="romInput">
-            <input id="romInput" class="file-input" type="file">
+            <input id="romInput" class="file-input" type="file" accept=".nes,.unf,.unif,.smc,.sfc,.fig,.swc,.gb,.gbc,.gba,.nds,.n64,.z64,.v64,.pbp,.chd,.cue,.ccd,.m3u,.iso,.img,.bin,.gen,.md,.smd,.32x,.sms,.gg,.a26,.a52,.a78,.lnx,.jag,.vb,.d64,.d71,.d81,.t64,.prg,.adf,.pce,.pcfx,.ngp,.ws,.wsc,.col,.zip,.7z,.rar" aria-describedby="uploadStatus fileHelp">
             <span class="upload-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0L7 9m5-5 5 5"/><path d="M4 16.5v2A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5v-2"/></svg></span>
             <span class="drop-title">Solte seu jogo aqui</span>
-            <span class="drop-help">ou escolha um arquivo do dispositivo</span>
+            <span id="fileHelp" class="drop-help">ROM, ISO, ZIP, 7Z ou RAR compatível, do seu dispositivo</span>
             <span class="file-button">Selecionar ROM</span>
           </label>
           <p id="uploadStatus" class="status" role="status" aria-live="polite">Nenhuma ROM carregada.</p>
