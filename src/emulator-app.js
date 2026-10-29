@@ -11,6 +11,7 @@ const BOOT_TIMEOUT_MS = 20000;
 const MAX_ROM_BYTES = 5 * 1024 * 1024 * 1024;      // 5 GB — Blobs grandes vão para o disco, não estouram o heap
 const MAX_ZIP_ENTRIES = 128;                        // zips bomba / arquivos com milhares de entradas
 const PROBE_BYTES = 512;                            // sniff de assinatura mágica no cabeçalho
+const CONTROLLER_PROFILE_KEY = 'arcade-rom-controller-profile-v1';
 const EXTENSIONS_BY_SYSTEM = {
   nes: ['nes', 'unf', 'unif'], snes: ['smc', 'sfc', 'fig', 'swc'], gb: ['gb', 'gbc'],
   gba: ['gba'], nds: ['nds'], n64: ['n64', 'z64', 'v64'],
@@ -36,8 +37,11 @@ const catalogSummary = document.getElementById('catalogSummary');
 const cleanupToast = document.getElementById('cleanupToast');
 const removeButton = document.getElementById('removeRom');
 const startWithSystemButton = document.getElementById('startWithSystem');
+const controllerStatus = document.getElementById('controllerStatus');
+const controllerReset = document.getElementById('resetControls');
 
 let activeFrame = null;
+let controllerSyncTimer = null;
 let operation = 0;          // token de geração: invalida trabalho assíncrono órfão
 let dragDepth = 0;
 let pendingFile = null;
@@ -54,6 +58,58 @@ function createRomUrl(blobOrFile) {
   activeRomUrl = URL.createObjectURL(blobOrFile);
   return activeRomUrl;
 }
+
+function loadControllerProfile() {
+  try {
+    const profile = JSON.parse(localStorage.getItem(CONTROLLER_PROFILE_KEY) || '{}');
+    return profile && typeof profile === 'object' ? profile : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveControllerProfile(profile) {
+  if (!profile || typeof profile !== 'object') return;
+  localStorage.setItem(CONTROLLER_PROFILE_KEY, JSON.stringify(profile));
+}
+
+// O próprio EmulatorJS salva o remapeamento por jogo. Também copiamos o último
+// controlSettings para um perfil global, pois jogadores esperam que o controle
+// configurado continue igual ao abrir outra ROM ou outro núcleo.
+function syncControllerProfile(frame) {
+  if (!frame?.contentWindow) return;
+  try {
+    for (let index = 0; index < frame.contentWindow.localStorage.length; index += 1) {
+      const key = frame.contentWindow.localStorage.key(index);
+      if (!key?.startsWith('ejs-') || !key.endsWith('-settings')) continue;
+      const saved = JSON.parse(frame.contentWindow.localStorage.getItem(key));
+      if (saved?.controlSettings && typeof saved.controlSettings === 'object') {
+        saveControllerProfile(saved.controlSettings);
+        return;
+      }
+    }
+  } catch { /* O armazenamento pode ficar bloqueado em modo privado. */ }
+}
+
+function updateControllerStatus() {
+  if (!controllerStatus) return;
+  const gamepads = navigator.getGamepads?.().filter(Boolean) ?? [];
+  const dot = controllerStatus.parentElement?.querySelector('.controller-dot');
+  if (!gamepads.length) {
+    controllerStatus.textContent = 'Nenhum controle detectado';
+    controllerStatus.dataset.connected = 'false';
+    if (dot) dot.style.background = '#777';
+    return;
+  }
+  controllerStatus.textContent = gamepads.map((gamepad, index) => gamepad.id || `Controle ${index + 1}`).join(' · ');
+  controllerStatus.dataset.connected = 'true';
+  if (dot) dot.style.background = 'var(--good)';
+}
+
+window.addEventListener('gamepadconnected', updateControllerStatus);
+window.addEventListener('gamepaddisconnected', updateControllerStatus);
+updateControllerStatus();
+setInterval(updateControllerStatus, 1500);
 
 // ---------------------------------------------------------------------------
 // Status / log
@@ -120,6 +176,8 @@ function watchBootProgress(frame, stage) {
 // iframe, então destruir o iframe devolve o heap ao GC de uma vez.
 async function cleanupEmulator(frame, { silent = false } = {}) {
   clearBootTimeout();
+  clearInterval(controllerSyncTimer);
+  controllerSyncTimer = null;
   revokeRomUrl();
   if (frame) {
     frame.removeEventListener('load', frame.__onLoad || (() => {}));
@@ -295,7 +353,8 @@ function hideCatalog() {
 // ---------------------------------------------------------------------------
 // Documento do iframe (núcleo isolado do app; recebe a ROM por transfer)
 // ---------------------------------------------------------------------------
-function emulatorDocument() {
+function emulatorDocument(controllerProfile = {}) {
+  const serializedProfile = JSON.stringify(controllerProfile).replaceAll('</script>', '<\\/script>');
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body,#game{width:100%;height:100%;margin:0;background:#000;overflow:hidden}#game{display:flex;align-items:center;justify-content:center}</style></head><body><div id="game"></div><script>
     addEventListener('message', event => {
       if (event.source !== parent || event.data?.type !== 'boot-rom' || typeof event.data.romUrl !== 'string') return;
@@ -303,6 +362,7 @@ function emulatorDocument() {
       parent.postMessage({ type: 'rom-received' }, '*');
       window.EJS_player = '#game';
       window.EJS_core = core;
+      window.EJS_defaultControls = ${serializedProfile};
       // Blob URL: o EmulatorJS baixa direto do Blob — o navegador gerencia a
       // memória (pode paginar para disco), sem duplicar a ROM no iframe.
       window.EJS_gameUrl = romUrl;
@@ -450,9 +510,11 @@ function bootWithBlob(blob, blobName, core, currentOperation, displayName) {
       frame.contentWindow.postMessage({ type: 'boot-rom', romUrl, core, name: displayName || blobName }, '*');
     };
     frame.addEventListener('load', frame.__onLoad, { once: true });
-    frame.srcdoc = emulatorDocument();
+    frame.srcdoc = emulatorDocument(loadControllerProfile());
     activeFrame = frame;
     emulatorHost.replaceChildren(frame);
+    clearInterval(controllerSyncTimer);
+    controllerSyncTimer = setInterval(() => syncControllerProfile(frame), 1000);
     watchBootProgress(frame, 'aguardando inicialização do EmulatorJS');
   }).catch(error => {
     if (operation !== currentOperation) return;
@@ -475,6 +537,24 @@ function receiveFiles(files) {
 romInput.addEventListener('change', () => {
   if (romInput.files?.length) receiveFiles(romInput.files);
   romInput.value = '';
+});
+
+controllerReset?.addEventListener('click', () => {
+  localStorage.removeItem(CONTROLLER_PROFILE_KEY);
+  try {
+    const keysToRemove = [];
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (key?.startsWith('ejs-') && key.endsWith('-settings')) keysToRemove.push(key);
+    }
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+  } catch { /* Preferência global removida; preferências restritas serão ignoradas pelo iframe. */ }
+  controllerStatus?.setAttribute('aria-label', 'Mapeamento de controles restaurado');
+  if (activeFrame?.contentWindow) {
+    syncControllerProfile(activeFrame);
+    localStorage.removeItem(CONTROLLER_PROFILE_KEY);
+  }
+  appendEmulatorLog('Mapeamento de controles restaurado para os padrões do sistema.', 'success');
 });
 
 removeButton.addEventListener('click', async () => {

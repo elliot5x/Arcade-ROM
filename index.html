@@ -65,6 +65,14 @@
     .rom-label span{color:var(--muted);font-size:11px}
     .remove-button{flex:none;min-height:38px;padding:0 12px;border:1px solid #78776a;border-radius:3px;background:transparent;color:var(--ink);font-size:12px;font-weight:700;cursor:pointer}
     .remove-button:hover{border-color:var(--accent);color:var(--accent)}
+    .controller-bar{margin-bottom:12px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);background:#111510;font-size:12px}
+    .controller-bar>div:first-child{min-width:0;display:flex;align-items:center;gap:8px}
+    #controllerStatus{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    #controllerStatus[data-connected=true]{color:var(--good)}
+    .controller-dot{width:8px;height:8px;flex:none;border-radius:50%;background:#777}
+    #controllerStatus[data-connected=true]+*{color:var(--good)}
+    .controller-actions{display:flex;align-items:center;gap:10px;color:var(--muted);text-align:right}
+    .controller-actions span{font-size:11px}
     .emulator-frame{display:block;width:100%;height:min(68vh,720px);min-height:320px;border:0;background:#000}
     .emulator-status{margin:10px 0 0;color:var(--muted);font-size:12px}
     .footer{padding:0 20px 22px;text-align:center;color:#82857c;font-size:11px}
@@ -83,7 +91,7 @@
 .catalog-play[disabled]{opacity:.55;cursor:wait}
     .drop-overlay{position:fixed;inset:12px;z-index:5;display:grid;place-items:center;border:2px dashed var(--accent);background:#171a18ed;color:var(--ink);font-size:clamp(20px,4vw,34px);font-weight:800;pointer-events:none}
     [hidden]{display:none!important}
-    @media(max-width:720px){.catalog-item{flex-wrap:wrap}.drop-overlay{inset:8px}.topbar{height:58px}.top-note{font-size:11px}.main{width:min(100% - 24px,560px);padding-top:34px}.workspace{grid-template-columns:1fr}.upload-pane{border-right:0;border-bottom:1px solid var(--line)}.side-pane{display:grid;grid-template-columns:1fr 1fr;gap:20px}.side-pane>section:last-child{grid-column:1/-1}.emulator-view{padding:12px}.emulator-toolbar{align-items:flex-start}.remove-button{font-size:11px}.emulator-frame{height:62vh;min-height:260px}}
+    @media(max-width:720px){.controller-bar{align-items:flex-start;flex-direction:column}.controller-actions{width:100%;justify-content:space-between;text-align:left}.controller-actions span{max-width:240px}.catalog-item{flex-wrap:wrap}.drop-overlay{inset:8px}.topbar{height:58px}.top-note{font-size:11px}.main{width:min(100% - 24px,560px);padding-top:34px}.workspace{grid-template-columns:1fr}.upload-pane{border-right:0;border-bottom:1px solid var(--line)}.side-pane{display:grid;grid-template-columns:1fr 1fr;gap:20px}.side-pane>section:last-child{grid-column:1/-1}.emulator-view{padding:12px}.emulator-toolbar{align-items:flex-start}.remove-button{font-size:11px}.emulator-frame{height:62vh;min-height:260px}}
     @media(max-width:420px){.side-pane{grid-template-columns:1fr}.side-pane>section:last-child{grid-column:auto}.emulator-toolbar{flex-wrap:wrap}.remove-button{width:100%}.emulator-frame{min-height:230px}}
   </style>
 </head>
@@ -140,6 +148,13 @@
         <div class="emulator-toolbar">
           <div class="rom-label"><strong id="romName"></strong><span id="romCore"></span></div>
           <button id="removeRom" class="remove-button" type="button">Remover / trocar ROM</button>
+        </div>
+        <div class="controller-bar" aria-label="Controles">
+          <div><span class="controller-dot" aria-hidden="true"></span><strong>Controle</strong><span id="controllerStatus">Nenhum controle detectado</span></div>
+          <div class="controller-actions">
+            <span>Remapear em Configurações → Controles. O perfil fica salvo para outros jogos.</span>
+            <button id="resetControls" class="remove-button" type="button">Restaurar padrão</button>
+          </div>
         </div>
         <div id="emulatorHost"></div>
         <section class="log-console" aria-label="Histórico do emulador">
