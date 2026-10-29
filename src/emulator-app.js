@@ -398,14 +398,32 @@ function emulatorDocument(controllerProfile = {}) {
         };
       });
       addEventListener('error', event => {
+        const failedResource = event.target?.src || event.target?.href;
+        if (failedResource) {
+          parent.postMessage({ type: 'emulator-error', message: 'Falha ao carregar recurso do emulador: ' + failedResource }, '*');
+          return;
+        }
         const location = event.filename ? ' @ ' + event.filename + ':' + event.lineno + ':' + event.colno : '';
         parent.postMessage({ type: 'emulator-error', message: event.error?.stack || (event.message || 'Erro inesperado no emulador.') + location }, '*');
-      });
+      }, true);
       addEventListener('unhandledrejection', event => parent.postMessage({ type: 'emulator-error', message: event.reason?.stack || event.reason?.message || String(event.reason || 'Falha ao carregar o jogo.') }, '*'));
       const loader = document.createElement('script');
       loader.src = window.EJS_pathtodata + 'loader.js';
       parent.postMessage({ type: 'loader-start' }, '*');
-      loader.onload = () => parent.postMessage({ type: 'loader-ready' }, '*');
+      loader.onload = () => {
+        parent.postMessage({ type: 'loader-ready' }, '*');
+        let constructionChecks = 0;
+        const constructionProbe = setInterval(() => {
+          constructionChecks += 1;
+          if (window.EJS_emulator) {
+            clearInterval(constructionProbe);
+            parent.postMessage({ type: 'emulator-construction-started' }, '*');
+          } else if (constructionChecks >= 300) {
+            clearInterval(constructionProbe);
+            parent.postMessage({ type: 'emulator-error', message: 'O EmulatorJS não criou o emulador após o loader carregar.' }, '*');
+          }
+        }, 1000);
+      };
       loader.onerror = () => parent.postMessage({ type: 'loader-error' }, '*');
       document.head.append(loader);
     }, { once: true });
@@ -614,6 +632,10 @@ window.addEventListener('message', event => {
   }
   if (event.data?.type === 'loader-ready') {
     appendEmulatorLog(`Loader carregado; inicializando core ${document.getElementById('romCore').textContent.replace('Núcleo: ', '')}...`);
+    watchBootProgress(activeFrame, 'baixando e compilando o núcleo');
+  }
+  if (event.data?.type === 'emulator-construction-started') {
+    appendEmulatorLog('EmulatorJS criado; baixando e compilando o núcleo…', 'info');
     watchBootProgress(activeFrame, 'baixando e compilando o núcleo');
   }
   if (event.data?.type === 'emulator-ready') {
