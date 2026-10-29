@@ -1,15 +1,14 @@
 // ---------------------------------------------------------------------------
 // Arcade ROM — controlador do emulador (arquitetura estilo RomsFUN)
-// Fluxo: origem (arquivo local | URL) -> Blob URL (zero-cópia, gerenciado pelo
-//        navegador — pode ser paginado para disco) -> inspeção .zip (JSZip,
-//        apenas índice central) -> seleção do binário -> iframe isolado ->
-//        o emulador baixa direto do Blob URL -> cleanup agressivo.
+// Fluxo: arquivo local -> Blob URL (zero-cópia, gerenciado pelo navegador) ->
+//        inspeção .zip (JSZip, apenas índice central) -> seleção do binário ->
+//        iframe isolado -> o emulador baixa direto do Blob URL -> cleanup agressivo.
 // ---------------------------------------------------------------------------
 import JSZip from 'jszip';
 
 const DATA_PATH = 'https://cdn.emulatorjs.org/stable/data/';
 const BOOT_TIMEOUT_MS = 20000;
-const MAX_ROM_BYTES = 2 * 1024 * 1024 * 1024;      // 2 GB — Blobs grandes vão para o disco, não estouram o heap
+const MAX_ROM_BYTES = 5 * 1024 * 1024 * 1024;      // 5 GB — Blobs grandes vão para o disco, não estouram o heap
 const MAX_ZIP_ENTRIES = 128;                        // zips bomba / arquivos com milhares de entradas
 const PROBE_BYTES = 512;                            // sniff de assinatura mágica no cabeçalho
 const EXTENSIONS_BY_SYSTEM = {
@@ -34,8 +33,6 @@ const dropOverlay = document.getElementById('dropOverlay');
 const catalogSection = document.getElementById('catalogSection');
 const catalogList = document.getElementById('catalogList');
 const catalogSummary = document.getElementById('catalogSummary');
-const catalogUrl = document.getElementById('catalogUrl');
-const catalogFetch = document.getElementById('catalogFetch');
 const cleanupToast = document.getElementById('cleanupToast');
 const removeButton = document.getElementById('removeRom');
 const startWithSystemButton = document.getElementById('startWithSystem');
@@ -331,64 +328,6 @@ function emulatorDocument() {
 // ---------------------------------------------------------------------------
 // Pipeline principal: origem -> bytes na RAM -> iframe
 // ---------------------------------------------------------------------------
-async function fetchRomFromUrl(url) {
-  let parsed;
-  try { parsed = new URL(url, location.href); } catch { throw new Error('URL inválida.'); }
-  if (!/^https?:$/.test(parsed.protocol)) throw new Error('A URL precisa ser http(s).');
-  appendEmulatorLog(`Baixando de ${parsed.host} (${formatBytes(0)} lidos)...`);
-  const response = await fetch(parsed.href, { mode: 'cors', credentials: 'omit', redirect: 'follow' });
-  if (!response.ok) throw new Error(`Download falhou: HTTP ${response.status}.`);
-  const declared = Number(response.headers.get('content-length')) || 0;
-  if (declared && declared > MAX_ROM_BYTES) throw new Error(`Arquivo de ${formatBytes(declared)} excede o limite de ${formatBytes(MAX_ROM_BYTES)}.`);
-
-  if (!response.body) {
-    const blob = await response.blob();
-    if (blob.size > MAX_ROM_BYTES) {
-      throw new Error(`Download excedeu ${formatBytes(MAX_ROM_BYTES)} — cancelado para proteger a memória.`);
-    }
-    return blob;
-  }
-
-  const reader = response.body.getReader();
-  let received = 0;
-  let nextMark = 1;
-  const monitoredBody = new ReadableStream({
-    async pull(controller) {
-      try {
-        const { done, value } = await reader.read();
-        if (done) {
-          reader.releaseLock();
-          controller.close();
-          return;
-        }
-        received += value.byteLength;
-        if (received > MAX_ROM_BYTES) {
-          await reader.cancel();
-          reader.releaseLock();
-          controller.error(new Error(`Download excedeu ${formatBytes(MAX_ROM_BYTES)} — cancelado para proteger a memória.`));
-          return;
-        }
-        const mb = Math.floor(received / (8 * 1024 * 1024));
-        if (mb >= nextMark) {
-          appendEmulatorLog(`Download: ${formatBytes(received)}...`);
-          nextMark = mb + 1;
-        }
-        controller.enqueue(value);
-      } catch (error) {
-        reader.releaseLock();
-        controller.error(error);
-      }
-    },
-    cancel(reason) {
-      return reader.cancel(reason);
-    }
-  });
-  // Deixa o navegador montar o Blob do fluxo sem reter uma lista de chunks em JavaScript.
-  return new Response(monitoredBody, {
-    headers: { 'Content-Type': 'application/octet-stream' }
-  }).blob();
-}
-
 async function startRom(source, requestedCore = null, { displayName = null } = {}) {
   stopEmulator();
   hideCatalog();
@@ -553,22 +492,6 @@ startWithSystemButton.addEventListener('click', () => {
   const selection = pendingFile;
   releasePendingFile();
   void startRom(selection, systemSelect.value);
-});
-
-catalogFetch.addEventListener('click', async () => {
-  const url = catalogUrl.value.trim();
-  if (!url) { setUploadStatus('Informe a URL do arquivo .zip (ou da ROM direta).', 'error'); return; }
-  catalogFetch.disabled = true;
-  try {
-    const romBlob = await fetchRomFromUrl(url);
-    const name = decodeURIComponent(new URL(url, location.href).pathname.split('/').pop() || 'rom.bin');
-    setUploadStatus(`Baixado: ${name} (${formatBytes(romBlob.size)}). Inspecionando...`, 'success');
-    await startRom({ blob: romBlob, name, displayName: name });
-  } catch (error) {
-    setUploadStatus(error.message, 'error');
-  } finally {
-    catalogFetch.disabled = false;
-  }
 });
 
 // Mensagens do iframe isolado

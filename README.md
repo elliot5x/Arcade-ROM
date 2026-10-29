@@ -1,15 +1,15 @@
 # Arcade ROM
 
-Emulador de jogos retrô executado no navegador. Selecione uma ROM do dispositivo, arraste o arquivo para a página ou informe uma URL para carregá-la e iniciar o jogo.
+Emulador de jogos retrô executado no navegador. Selecione uma ROM do dispositivo ou arraste o arquivo para a página para iniciar o jogo.
 
 O projeto não inclui ROMs. Use apenas jogos e arquivos auxiliares que você tenha direito de utilizar.
 
 ## Recursos
 
-- Carregamento de arquivos locais ou por URL HTTP/HTTPS. Downloads remotos dependem de o servidor permitir acesso via CORS.
+- Carregamento de arquivos locais por seleção ou arrastar e soltar.
 - Detecção automática de alguns sistemas por extensão e assinatura do arquivo, com seleção manual do sistema quando necessário.
 - Inspeção de arquivos ZIP com até 128 entradas e seleção da ROM a extrair.
-- Limite de 2 GiB para ROMs diretas e downloads por URL.
+- Limite de 5 GiB para ROMs diretas.
 - Execução isolada em um `iframe`, com a ROM referenciada por Blob URL em vez de ser copiada por `postMessage`.
 - A ROM local é processada no navegador; ela não é enviada a um servidor pelo site. O EmulatorJS e os dados do núcleo são carregados sob demanda de `cdn.emulatorjs.org`, portanto é necessária conexão à internet.
 

@@ -1,10 +1,49 @@
+# Dependências e artefatos gerados
 node_modules/
 dist/
+.build/
+.cache/
+coverage/
+artifacts/
+
+# Build, cache e logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.vite/
+*.tsbuildinfo
+
+# Ambiente local e secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+
+# Ambientes de desenvolvimento
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+
+# Arquivos temporários e do sistema
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.tmp
+*.temp
+~$*
+
+# Fontes de dados locais e referências não distribuíveis
 source/
 references/
 __pycache__/
-.DS_Store
-artifacts/
+
+# ROMs e imagens de mídia utilizadas apenas localmente
 *.iso
 *.ISO
 *.rcf
@@ -12,6 +51,11 @@ artifacts/
 *.p3d
 *.rsd
 *.rmv
-.env
-.env.*
-!.env.example
+*.chd
+*.CHD
+*.cue
+*.CUE
+*.bin
+*.BIN
+*.rom
+*.ROM
